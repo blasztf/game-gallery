@@ -118,6 +118,60 @@ class WindowButtons extends StatelessWidget {
   }
 }
 
+// Future<bool> processCheck(int watchPid) async {
+//   String result = "";
+//   Process p = await Process.start("tasklist | findstr \"$watchPid\"", []);
+//   p.stdout.transform(utf8.decoder).forEach(((element) {
+//     result += element;
+//   }));
+//   result = result.trim();
+//   return result.isNotEmpty;
+// }
+
+// class ProcessObserver {
+//   void onProcessObserved(int pid, bool isRunning) {}
+// }
+
+// class ProcessWatcher {
+//   final Set<ProcessObserver> _listeners = {};
+//   bool _shouldStart = false;
+//   int _watchPid = 0;
+
+//   void addListener(ProcessObserver listener) {
+//     _listeners.add(listener);
+//   }
+
+//   void removeListener(ProcessObserver listener) {
+//     _listeners.remove(listener);
+//   }
+
+//   void listen(int watchPid) {
+//     stop();
+//     _watchPid = watchPid;
+//     _shouldStart = true;
+//     _run();
+//   }
+
+//   void stop() {
+//     _watchPid = 0;
+//     _shouldStart = false;
+//   }
+
+//   void _run() async {
+//     bool result;
+
+//     while (_shouldStart) {
+//       if (_listeners.isNotEmpty) {
+//         result = await processCheck(_watchPid);
+//         _listeners
+//             .map((listener) => listener.onProcessObserved(_watchPid, result));
+
+//         sleep(const Duration(seconds: 3));
+//       }
+//     }
+//   }
+// }
+
 class GameGalleryStorage {
   const GameGalleryStorage();
 
@@ -184,15 +238,16 @@ class GameGalleryData {
     };
   }
 
-  void start() async {
-    await Process.run(executablePath, []);
+  void start(Function(int) callback) async {
+    ProcessResult p = await Process.run(executablePath, []);
+    callback(p.pid);
   }
 }
 
 class GameGalleryApp extends StatelessWidget {
   const GameGalleryApp({super.key});
 
-  final String title = "Big Picture";
+  final String title = "Game Gallery";
 
   // This widget is the root of your application.
   @override
@@ -240,6 +295,7 @@ class _GameGalleryPageState extends State<GameGalleryPage>
   bool _isDragging = false;
   List<GameGalleryData> _listItem = [];
   int _lastPosition = 0;
+  bool _isGameRunning = false;
 
   int get _sizeItem => _listItem.length;
   int get _crossAxisCount => _lastSize.width > 1920
@@ -254,9 +310,21 @@ class _GameGalleryPageState extends State<GameGalleryPage>
 
   final Controller _gamepadController = Controller(index: 0);
   final ScrollController _scrollController = ScrollController();
+  // final ProcessWatcher _processWatcher = ProcessWatcher();
 
   void _scrollTo(int index) {
-    _scrollController.jumpTo(_lastSize.height * (_crossAxisCount % index));
+    // print("Max scroll extent: ${_scrollController.position.maxScrollExtent}");
+    // print("Context size height: ${context.size?.height}");
+    // var height = _scrollController.position.maxScrollExtent +
+    //     (context.size?.height ?? 0);
+    // var val = index / (_sizeItem / _crossAxisCount).round() * height;
+    // print("Height: ${height}");
+    // print("Value: ${val}");
+
+    double newVal =
+        (index / _crossAxisCount).floor() * ((context.size?.height ?? 0));
+    _scrollController.jumpTo(newVal);
+    // print("New Val: $newVal");
   }
 
   int _movePointerUp() {
@@ -339,38 +407,16 @@ class _GameGalleryPageState extends State<GameGalleryPage>
         WidgetsBinding.instance.window.devicePixelRatio;
   }
 
-  @override
-  void initState() {
-    super.initState();
-    widget.storage.load().then((value) {
-      setState(() {
-        _listItem = value;
-      });
+  void _startGame(GameGalleryData game) {
+    setState(() {
+      _isGameRunning = true;
     });
-
-    _calcDisplaySize();
-    WidgetsBinding.instance.addObserver(this);
-
-    _gamepadController.buttonsMapping = {
-      ControllerButton.DPAD_LEFT: () => _movePointer('left'),
-      ControllerButton.DPAD_RIGHT: () => _movePointer('right'),
-      ControllerButton.DPAD_UP: () => _movePointer('up'),
-      ControllerButton.DPAD_DOWN: () => _movePointer('down'),
-      ControllerButton.START: () => _getItem(_lastPosition).start()
-    };
-
-    _gamepadController.listen();
-
-    windowManager.addListener(this);
-
-    _scrollController.addListener(() {});
-  }
-
-  @override
-  void dispose() {
-    windowManager.removeListener(this);
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
+    game.start((gamePid) {
+      setState(() {
+        _isGameRunning = false;
+      });
+      // _processWatcher.listen(gamePid);
+    });
   }
 
   @override
@@ -390,6 +436,47 @@ class _GameGalleryPageState extends State<GameGalleryPage>
   void onWindowFocus() {
     _gamepadController.activated = true;
     super.onWindowFocus();
+  }
+
+  // @override
+  // void onProcessObserved(int pid, bool isRunning) {
+  //   print("PID: ${pid} | Running: ${isRunning ? 'yes' : 'no'}");
+  // }
+
+  @override
+  void initState() {
+    super.initState();
+    widget.storage.load().then((value) {
+      setState(() {
+        _listItem = value;
+      });
+    });
+
+    _calcDisplaySize();
+    WidgetsBinding.instance.addObserver(this);
+
+    _gamepadController.buttonsMapping = {
+      ControllerButton.DPAD_LEFT: () => _movePointer('left'),
+      ControllerButton.DPAD_RIGHT: () => _movePointer('right'),
+      ControllerButton.DPAD_UP: () => _movePointer('up'),
+      ControllerButton.DPAD_DOWN: () => _movePointer('down'),
+      ControllerButton.START: () => _startGame(_getItem(_lastPosition))
+    };
+
+    _gamepadController.listen();
+
+    windowManager.addListener(this);
+
+    // _processWatcher.addListener(this);
+  }
+
+  @override
+  void dispose() {
+    windowManager.removeListener(this);
+    WidgetsBinding.instance.removeObserver(this);
+    // _processWatcher.stop();
+    // _processWatcher.removeListener(this);
+    super.dispose();
   }
 
   @override
@@ -436,7 +523,7 @@ class _GameGalleryPageState extends State<GameGalleryPage>
                             GameGalleryItem(
                               data: _getItem(index),
                               isSelected: _lastPosition == index,
-                              onTap: (data) => data.start(),
+                              onTap: (data) => _startGame(data),
                             )),
                     if (_isDragging)
                       Positioned.fill(
@@ -451,6 +538,19 @@ class _GameGalleryPageState extends State<GameGalleryPage>
                               ),
                             )),
                       ),
+                    if (_isGameRunning)
+                      Positioned.fill(
+                        child: Container(
+                            color: mcgpalette0Accent.withOpacity(0.8),
+                            child: const Align(
+                              alignment: Alignment.center,
+                              child: Text(
+                                "Game is running...",
+                                textScaleFactor: 1.5,
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            )),
+                      )
                   ],
                 ))),
         floatingActionButton: FloatingActionButton(
