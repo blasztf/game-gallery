@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -7,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:window_manager/window_manager.dart';
+import 'package:xinput_gamepad/xinput_gamepad.dart';
 
 void main() {
   runApp(const GameGalleryApp());
@@ -180,6 +183,10 @@ class GameGalleryData {
       'coverPath': value.coverPath
     };
   }
+
+  void start() async {
+    await Process.run(executablePath, []);
+  }
 }
 
 class GameGalleryApp extends StatelessWidget {
@@ -228,22 +235,86 @@ class GameGalleryPage extends StatefulWidget {
 }
 
 class _GameGalleryPageState extends State<GameGalleryPage>
-    with WidgetsBindingObserver {
-  bool _isDragging = false;
+    with WidgetsBindingObserver, WindowListener {
   late Size _lastSize;
+  bool _isDragging = false;
+  List<GameGalleryData> _listItem = [];
+  int _lastPosition = 0;
 
-  late List<GameGalleryData> listItem = [];
+  int get _sizeItem => _listItem.length;
+  int get _crossAxisCount => _lastSize.width > 1920
+      ? 8
+      : _lastSize.width > 960
+          ? 6
+          : _lastSize.width > 640
+              ? 4
+              : _lastSize.width > 480
+                  ? 2
+                  : 1;
+
+  final Controller _gamepadController = Controller(index: 0);
+  final ScrollController _scrollController = ScrollController();
+
+  void _scrollTo(int index) {
+    _scrollController.jumpTo(_lastSize.height * (_crossAxisCount % index));
+  }
+
+  int _movePointerUp() {
+    int newPosition = _lastPosition - _crossAxisCount;
+    return newPosition >= 0 ? newPosition : _lastPosition;
+  }
+
+  int _movePointerDown() {
+    int newPosition = _lastPosition + _crossAxisCount;
+    return newPosition < _sizeItem ? newPosition : _lastPosition;
+  }
+
+  int _movePointerLeft() {
+    int newPosition = _lastPosition - 1;
+    return newPosition >= 0 ? newPosition : _lastPosition;
+  }
+
+  int _movePointerRight() {
+    int newPosition = _lastPosition + 1;
+    return newPosition < _sizeItem ? newPosition : _lastPosition;
+  }
+
+  void _movePointer(String key) {
+    int newPosition = _lastPosition;
+    switch (key) {
+      case 'up':
+        newPosition = _movePointerUp();
+        break;
+      case 'down':
+        newPosition = _movePointerDown();
+        break;
+      case 'left':
+        newPosition = _movePointerLeft();
+        break;
+      case 'right':
+        newPosition = _movePointerRight();
+        break;
+      default:
+    }
+
+    if (_lastPosition != newPosition) {
+      setState(() {
+        _lastPosition = newPosition;
+        _scrollTo(_lastPosition);
+      });
+    }
+  }
 
   void _addItem(final GameGalleryData item) {
     setState(() {
-      listItem.add(item);
-      widget.storage.save(listItem);
+      _listItem.add(item);
+      widget.storage.save(_listItem);
     });
   }
 
-  GameGalleryData _getItem(int index) => listItem[index];
-
-  int get _sizeItem => listItem.length;
+  GameGalleryData _getItem(int index) {
+    return _listItem[index];
+  }
 
   void _selectCoverImage(
       void Function(PlatformFile? coverFile) onComplete) async {
@@ -273,16 +344,31 @@ class _GameGalleryPageState extends State<GameGalleryPage>
     super.initState();
     widget.storage.load().then((value) {
       setState(() {
-        listItem = value;
+        _listItem = value;
       });
     });
 
     _calcDisplaySize();
     WidgetsBinding.instance.addObserver(this);
+
+    _gamepadController.buttonsMapping = {
+      ControllerButton.DPAD_LEFT: () => _movePointer('left'),
+      ControllerButton.DPAD_RIGHT: () => _movePointer('right'),
+      ControllerButton.DPAD_UP: () => _movePointer('up'),
+      ControllerButton.DPAD_DOWN: () => _movePointer('down'),
+      ControllerButton.START: () => _getItem(_lastPosition).start()
+    };
+
+    _gamepadController.listen();
+
+    windowManager.addListener(this);
+
+    _scrollController.addListener(() {});
   }
 
   @override
   void dispose() {
+    windowManager.removeListener(this);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -292,7 +378,18 @@ class _GameGalleryPageState extends State<GameGalleryPage>
     setState(() {
       _calcDisplaySize();
     });
-    // print(WidgetsBinding.instance.window.physicalSize);
+  }
+
+  @override
+  void onWindowBlur() {
+    _gamepadController.activated = false;
+    super.onWindowBlur();
+  }
+
+  @override
+  void onWindowFocus() {
+    _gamepadController.activated = true;
+    super.onWindowFocus();
   }
 
   @override
@@ -329,21 +426,18 @@ class _GameGalleryPageState extends State<GameGalleryPage>
                 child: Stack(
                   children: [
                     AlignedGridView.count(
+                        controller: _scrollController,
                         padding: const EdgeInsets.all(25.0),
                         mainAxisSpacing: 25.0,
                         crossAxisSpacing: 50.0,
-                        crossAxisCount: _lastSize.width > 1920
-                            ? 8
-                            : _lastSize.width > 960
-                                ? 6
-                                : _lastSize.width > 640
-                                    ? 4
-                                    : _lastSize.width > 480
-                                        ? 2
-                                        : 1,
+                        crossAxisCount: _crossAxisCount,
                         itemCount: _sizeItem,
                         itemBuilder: (BuildContext context, int index) =>
-                            GameGalleryItem(data: _getItem(index))),
+                            GameGalleryItem(
+                              data: _getItem(index),
+                              isSelected: _lastPosition == index,
+                              onTap: (data) => data.start(),
+                            )),
                     if (_isDragging)
                       Positioned.fill(
                         child: Container(
@@ -385,9 +479,15 @@ class _GameGalleryPageState extends State<GameGalleryPage>
 }
 
 class GameGalleryItem extends StatefulWidget {
-  const GameGalleryItem({super.key, required this.data});
+  const GameGalleryItem(
+      {super.key,
+      required this.data,
+      required this.isSelected,
+      required this.onTap});
 
   final GameGalleryData data;
+  final bool isSelected;
+  final Function(GameGalleryData) onTap;
 
   @override
   State<GameGalleryItem> createState() => _GameGalleryItemState();
@@ -399,14 +499,20 @@ class _GameGalleryItemState extends State<GameGalleryItem> {
     return Material(
         elevation: 8.0,
         color: mcgpalette0Accent,
-        child: InkWell(
-          onTap: () async {
-            await Process.start(widget.data.executablePath, []);
-          },
-          onHover: (isHover) {},
-          child: ClipRRect(
-              borderRadius: BorderRadius.circular(8.0),
-              child: Image.file(fit: BoxFit.fill, File(widget.data.coverPath))),
-        ));
+        child: Container(
+            decoration: BoxDecoration(boxShadow: [
+              BoxShadow(
+                  color: Colors.amber.shade800
+                      .withAlpha(widget.isSelected ? 255 : 0),
+                  blurRadius: 6.0,
+                  spreadRadius: 0.0)
+            ]),
+            child: InkWell(
+              onTap: () => widget.onTap(widget.data),
+              child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8.0),
+                  child: Image.file(
+                      fit: BoxFit.fill, File(widget.data.coverPath))),
+            )));
   }
 }
