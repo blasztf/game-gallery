@@ -10,11 +10,12 @@ import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:xinput_gamepad/xinput_gamepad.dart';
+import 'dart:math';
 
 void main() {
   runApp(const GameGalleryApp());
   doWhenWindowReady(() {
-    const initialSize = Size(400, 320);
+    const initialSize = Size(400, 640);
     appWindow.minSize = initialSize;
     appWindow.size = initialSize;
     appWindow.alignment = Alignment.center;
@@ -118,59 +119,214 @@ class WindowButtons extends StatelessWidget {
   }
 }
 
-// Future<bool> processCheck(int watchPid) async {
-//   String result = "";
-//   Process p = await Process.start("tasklist | findstr \"$watchPid\"", []);
-//   p.stdout.transform(utf8.decoder).forEach(((element) {
-//     result += element;
-//   }));
-//   result = result.trim();
-//   return result.isNotEmpty;
-// }
+@immutable
+class ActionButton extends StatelessWidget {
+  const ActionButton({
+    super.key,
+    this.onPressed,
+    required this.icon,
+  });
 
-// class ProcessObserver {
-//   void onProcessObserved(int pid, bool isRunning) {}
-// }
+  final VoidCallback? onPressed;
+  final Widget icon;
 
-// class ProcessWatcher {
-//   final Set<ProcessObserver> _listeners = {};
-//   bool _shouldStart = false;
-//   int _watchPid = 0;
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      color: theme.colorScheme.secondary,
+      elevation: 4.0,
+      child: IconButton(
+        onPressed: onPressed,
+        icon: icon,
+        color: theme.colorScheme.onSecondary,
+      ),
+    );
+  }
+}
 
-//   void addListener(ProcessObserver listener) {
-//     _listeners.add(listener);
-//   }
+@immutable
+class _ExpandingActionButton extends StatelessWidget {
+  const _ExpandingActionButton({
+    required this.directionInDegrees,
+    required this.maxDistance,
+    required this.progress,
+    required this.child,
+  });
 
-//   void removeListener(ProcessObserver listener) {
-//     _listeners.remove(listener);
-//   }
+  final double directionInDegrees;
+  final double maxDistance;
+  final Animation<double> progress;
+  final Widget child;
 
-//   void listen(int watchPid) {
-//     stop();
-//     _watchPid = watchPid;
-//     _shouldStart = true;
-//     _run();
-//   }
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: progress,
+      builder: (context, child) {
+        final offset = Offset.fromDirection(
+          directionInDegrees * (pi / 180.0),
+          progress.value * maxDistance,
+        );
+        return Positioned(
+          right: 4.0 + offset.dx,
+          bottom: 4.0 + offset.dy,
+          child: Transform.rotate(
+            angle: (1.0 - progress.value) * pi / 2,
+            child: child!,
+          ),
+        );
+      },
+      child: FadeTransition(
+        opacity: progress,
+        child: child,
+      ),
+    );
+  }
+}
 
-//   void stop() {
-//     _watchPid = 0;
-//     _shouldStart = false;
-//   }
+@immutable
+class ExpandableFab extends StatefulWidget {
+  const ExpandableFab({
+    super.key,
+    this.initialOpen,
+    required this.distance,
+    required this.children,
+  });
 
-//   void _run() async {
-//     bool result;
+  final bool? initialOpen;
+  final double distance;
+  final List<Widget> children;
 
-//     while (_shouldStart) {
-//       if (_listeners.isNotEmpty) {
-//         result = await processCheck(_watchPid);
-//         _listeners
-//             .map((listener) => listener.onProcessObserved(_watchPid, result));
+  @override
+  State<ExpandableFab> createState() => _ExpandableFabState();
+}
 
-//         sleep(const Duration(seconds: 3));
-//       }
-//     }
-//   }
-// }
+class _ExpandableFabState extends State<ExpandableFab>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _expandAnimation;
+  bool _open = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _open = widget.initialOpen ?? false;
+    _controller = AnimationController(
+      value: _open ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 250),
+      vsync: this,
+    );
+    _expandAnimation = CurvedAnimation(
+      curve: Curves.fastOutSlowIn,
+      reverseCurve: Curves.easeOutQuad,
+      parent: _controller,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    setState(() {
+      _open = !_open;
+      if (_open) {
+        _controller.forward();
+      } else {
+        _controller.reverse();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.expand(
+      child: Stack(
+        alignment: Alignment.bottomRight,
+        clipBehavior: Clip.none,
+        children: [
+          _buildTapToCloseFab(),
+          ..._buildExpandingActionButtons(),
+          _buildTapToOpenFab(),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildExpandingActionButtons() {
+    final children = <Widget>[];
+    final count = widget.children.length;
+    final step = 90.0 / (count - 1);
+    for (var i = 0, angleInDegrees = 0.0;
+        i < count;
+        i++, angleInDegrees += step) {
+      children.add(
+        _ExpandingActionButton(
+          directionInDegrees: angleInDegrees,
+          maxDistance: widget.distance,
+          progress: _expandAnimation,
+          child: widget.children[i],
+        ),
+      );
+    }
+    return children;
+  }
+
+  Widget _buildTapToCloseFab() {
+    return SizedBox(
+      width: 56.0,
+      height: 56.0,
+      child: Center(
+        child: Material(
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          elevation: 4.0,
+          child: InkWell(
+            onTap: _toggle,
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Icon(
+                Icons.close,
+                color: Theme.of(context).primaryColor,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTapToOpenFab() {
+    return IgnorePointer(
+      ignoring: _open,
+      child: AnimatedContainer(
+        transformAlignment: Alignment.center,
+        transform: Matrix4.diagonal3Values(
+          _open ? 0.7 : 1.0,
+          _open ? 0.7 : 1.0,
+          1.0,
+        ),
+        duration: const Duration(milliseconds: 250),
+        curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
+        child: AnimatedOpacity(
+          opacity: _open ? 0.0 : 1.0,
+          curve: const Interval(0.25, 1.0, curve: Curves.easeInOut),
+          duration: const Duration(milliseconds: 250),
+          child: FloatingActionButton(
+            onPressed: _toggle,
+            backgroundColor: mcgpalette0,
+            child: const Icon(Icons.settings),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class GameGalleryStorage {
   const GameGalleryStorage();
@@ -294,6 +450,7 @@ class _GameGalleryPageState extends State<GameGalleryPage>
   late Size _lastSize;
   bool _isDragging = false;
   List<GameGalleryData> _listItem = [];
+
   int _lastPosition = 0;
   bool _isGameRunning = false;
 
@@ -310,21 +467,13 @@ class _GameGalleryPageState extends State<GameGalleryPage>
 
   final Controller _gamepadController = Controller(index: 0);
   final ScrollController _scrollController = ScrollController();
-  // final ProcessWatcher _processWatcher = ProcessWatcher();
 
   void _scrollTo(int index) {
-    // print("Max scroll extent: ${_scrollController.position.maxScrollExtent}");
-    // print("Context size height: ${context.size?.height}");
-    // var height = _scrollController.position.maxScrollExtent +
-    //     (context.size?.height ?? 0);
-    // var val = index / (_sizeItem / _crossAxisCount).round() * height;
-    // print("Height: ${height}");
-    // print("Value: ${val}");
-
-    double newVal =
-        (index / _crossAxisCount).floor() * ((context.size?.height ?? 0));
-    _scrollController.jumpTo(newVal);
-    // print("New Val: $newVal");
+    try {
+      Scrollable.ensureVisible(GlobalObjectKey(_getItem(index)).currentContext!,
+          alignment: .5);
+      // ignore: empty_catches
+    } catch (e) {}
   }
 
   int _movePointerUp() {
@@ -368,16 +517,23 @@ class _GameGalleryPageState extends State<GameGalleryPage>
     if (_lastPosition != newPosition) {
       setState(() {
         _lastPosition = newPosition;
-        _scrollTo(_lastPosition);
       });
+      _scrollTo(_lastPosition);
     }
   }
 
   void _addItem(final GameGalleryData item) {
     setState(() {
       _listItem.add(item);
-      widget.storage.save(_listItem);
     });
+    widget.storage.save(_listItem);
+  }
+
+  void _removeItem(final GameGalleryData item) {
+    setState(() {
+      _listItem.remove(item);
+    });
+    widget.storage.save(_listItem);
   }
 
   GameGalleryData _getItem(int index) {
@@ -402,8 +558,8 @@ class _GameGalleryPageState extends State<GameGalleryPage>
     onComplete(result?.files.single);
   }
 
-  void _calcDisplaySize() {
-    _lastSize = WidgetsBinding.instance.window.physicalSize /
+  Size _calcDisplaySize() {
+    return WidgetsBinding.instance.window.physicalSize /
         WidgetsBinding.instance.window.devicePixelRatio;
   }
 
@@ -415,14 +571,13 @@ class _GameGalleryPageState extends State<GameGalleryPage>
       setState(() {
         _isGameRunning = false;
       });
-      // _processWatcher.listen(gamePid);
     });
   }
 
   @override
   void didChangeMetrics() {
     setState(() {
-      _calcDisplaySize();
+      _lastSize = _calcDisplaySize();
     });
   }
 
@@ -438,11 +593,6 @@ class _GameGalleryPageState extends State<GameGalleryPage>
     super.onWindowFocus();
   }
 
-  // @override
-  // void onProcessObserved(int pid, bool isRunning) {
-  //   print("PID: ${pid} | Running: ${isRunning ? 'yes' : 'no'}");
-  // }
-
   @override
   void initState() {
     super.initState();
@@ -452,7 +602,7 @@ class _GameGalleryPageState extends State<GameGalleryPage>
       });
     });
 
-    _calcDisplaySize();
+    _lastSize = _calcDisplaySize();
     WidgetsBinding.instance.addObserver(this);
 
     _gamepadController.buttonsMapping = {
@@ -466,95 +616,101 @@ class _GameGalleryPageState extends State<GameGalleryPage>
     _gamepadController.listen();
 
     windowManager.addListener(this);
-
-    // _processWatcher.addListener(this);
   }
 
   @override
   void dispose() {
     windowManager.removeListener(this);
     WidgetsBinding.instance.removeObserver(this);
-    // _processWatcher.stop();
-    // _processWatcher.removeListener(this);
+
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        body: DropTarget(
-            onDragDone: (detail) {
-              if (detail.files.length > 1) {
-                showErrno(context, Errno.dragAndDropMultipleItems);
-              } else {
-                _selectCoverImage((coverFile) {
-                  if (coverFile?.path != null) {
-                    _addItem(GameGalleryData(
-                        executablePath: detail.files[0].path,
-                        coverPath: coverFile?.path ?? ''));
-                  } else {
-                    showErrno(context, Errno.pickerFileNotSelected);
-                  }
-                });
-              }
-            },
-            onDragEntered: (detail) {
-              setState(() {
-                _isDragging = true;
+      body: DropTarget(
+          onDragDone: (detail) {
+            if (detail.files.length > 1) {
+              showErrno(context, Errno.dragAndDropMultipleItems);
+            } else {
+              _selectCoverImage((coverFile) {
+                if (coverFile?.path != null) {
+                  _addItem(GameGalleryData(
+                      executablePath: detail.files[0].path,
+                      coverPath: coverFile?.path ?? ''));
+                } else {
+                  showErrno(context, Errno.pickerFileNotSelected);
+                }
               });
-            },
-            onDragExited: (detail) {
-              setState(() {
-                _isDragging = false;
-              });
-            },
-            child: Container(
-                color: mcgpalette0Accent,
-                child: Stack(
-                  children: [
-                    AlignedGridView.count(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(25.0),
-                        mainAxisSpacing: 25.0,
-                        crossAxisSpacing: 50.0,
-                        crossAxisCount: _crossAxisCount,
-                        itemCount: _sizeItem,
-                        itemBuilder: (BuildContext context, int index) =>
-                            GameGalleryItem(
-                              data: _getItem(index),
-                              isSelected: _lastPosition == index,
-                              onTap: (data) => _startGame(data),
-                            )),
-                    if (_isDragging)
-                      Positioned.fill(
-                        child: Container(
-                            color: mcgpalette0Accent.withOpacity(0.8),
-                            child: const Align(
-                              alignment: Alignment.center,
-                              child: Text(
-                                "Drag and drop file to add new item",
-                                textScaleFactor: 1.5,
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            )),
-                      ),
-                    if (_isGameRunning)
-                      Positioned.fill(
-                        child: Container(
-                            color: mcgpalette0Accent.withOpacity(0.8),
-                            child: const Align(
-                              alignment: Alignment.center,
-                              child: Text(
-                                "Game is running...",
-                                textScaleFactor: 1.5,
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            )),
-                      )
-                  ],
-                ))),
-        floatingActionButton: FloatingActionButton(
-          backgroundColor: mcgpalette0,
+            }
+          },
+          onDragEntered: (detail) {
+            setState(() {
+              _isDragging = true;
+            });
+          },
+          onDragExited: (detail) {
+            setState(() {
+              _isDragging = false;
+            });
+          },
+          child: Container(
+              color: mcgpalette0Accent,
+              child: Stack(
+                children: [
+                  AlignedGridView.count(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(25.0),
+                      mainAxisSpacing: 25.0,
+                      crossAxisSpacing: 50.0,
+                      crossAxisCount: _crossAxisCount,
+                      itemCount: _sizeItem,
+                      itemBuilder: (BuildContext context, int index) =>
+                          GameGalleryItem(
+                            key: GlobalObjectKey(_getItem(index)),
+                            data: _getItem(index),
+                            isSelected: _lastPosition == index,
+                            onTap: (data) {
+                              setState(() {
+                                _lastPosition = index;
+                              });
+                              _startGame(data);
+                            },
+                            onLongPress: (data) {
+                              _removeItem(data);
+                            },
+                          )),
+                  if (_isDragging)
+                    Positioned.fill(
+                      child: Container(
+                          color: mcgpalette0Accent.withOpacity(0.8),
+                          child: const Align(
+                            alignment: Alignment.center,
+                            child: Text(
+                              "Drag and drop file to add new item",
+                              textScaleFactor: 1.5,
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          )),
+                    ),
+                  if (_isGameRunning)
+                    Positioned.fill(
+                      child: Container(
+                          color: mcgpalette0Accent.withOpacity(0.8),
+                          child: const Align(
+                            alignment: Alignment.center,
+                            child: Text(
+                              "Game is running...",
+                              textScaleFactor: 1.5,
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          )),
+                    )
+                ],
+              ))),
+      floatingActionButton: ExpandableFab(distance: 112.0, children: [
+        ActionButton(
           onPressed: () {
             _selectGameBinary((binaryFile) {
               if (binaryFile?.path != null) {
@@ -572,9 +728,22 @@ class _GameGalleryPageState extends State<GameGalleryPage>
               }
             });
           },
-          tooltip: 'Add item',
-          child: const Icon(Icons.add),
-        ));
+          icon: const Icon(Icons.add),
+        ),
+        ActionButton(
+          onPressed: () => showMessage(context, "FAB child 2"),
+          icon: const Icon(Icons.gamepad),
+        ),
+        ActionButton(
+          onPressed: () => showMessage(context, "FAB child 3"),
+          icon: const Icon(Icons.monitor),
+        ),
+        ActionButton(
+          onPressed: () => showMessage(context, "FAB child 3"),
+          icon: const Icon(Icons.monitor),
+        ),
+      ]),
+    );
   }
 }
 
@@ -583,11 +752,15 @@ class GameGalleryItem extends StatefulWidget {
       {super.key,
       required this.data,
       required this.isSelected,
-      required this.onTap});
+      this.onTap,
+      this.onLongPress,
+      this.onHover});
 
   final GameGalleryData data;
   final bool isSelected;
-  final Function(GameGalleryData) onTap;
+  final Function(GameGalleryData)? onTap;
+  final Function(GameGalleryData)? onLongPress;
+  final Function(GameGalleryData)? onHover;
 
   @override
   State<GameGalleryItem> createState() => _GameGalleryItemState();
@@ -602,13 +775,16 @@ class _GameGalleryItemState extends State<GameGalleryItem> {
         child: Container(
             decoration: BoxDecoration(boxShadow: [
               BoxShadow(
-                  color: Colors.amber.shade800
+                  color: Colors.amber.shade900
                       .withAlpha(widget.isSelected ? 255 : 0),
                   blurRadius: 6.0,
                   spreadRadius: 0.0)
             ]),
             child: InkWell(
-              onTap: () => widget.onTap(widget.data),
+              onTap: () => widget.onTap?.call(widget.data),
+              onLongPress: () => widget.onLongPress?.call(widget.data),
+              onHover: (isHover) =>
+                  isHover ? widget.onHover?.call(widget.data) : null,
               child: ClipRRect(
                   borderRadius: BorderRadius.circular(8.0),
                   child: Image.file(
