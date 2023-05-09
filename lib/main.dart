@@ -436,6 +436,33 @@ class GameGalleryApp extends StatelessWidget {
   }
 }
 
+class GameGalleryPageOverlay extends StatefulWidget {
+  const GameGalleryPageOverlay({super.key, this.message = ""});
+
+  final String message;
+
+  @override
+  State<StatefulWidget> createState() => _GameGalleryPageOverlayState();
+}
+
+class _GameGalleryPageOverlayState extends State<GameGalleryPageOverlay> {
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: Container(
+          color: mcgpalette0Accent.withOpacity(0.8),
+          child: Align(
+            alignment: Alignment.center,
+            child: Text(
+              widget.message,
+              textScaleFactor: 1.5,
+              style: const TextStyle(color: Colors.white),
+            ),
+          )),
+    );
+  }
+}
+
 class GameGalleryPage extends StatefulWidget {
   const GameGalleryPage({super.key, required this.storage});
 
@@ -453,6 +480,7 @@ class _GameGalleryPageState extends State<GameGalleryPage>
 
   int _lastPosition = 0;
   bool _isGameRunning = false;
+  bool _isFilePickerOpen = false;
 
   int get _sizeItem => _listItem.length;
   int get _crossAxisCount => _lastSize.width > 1920
@@ -540,22 +568,40 @@ class _GameGalleryPageState extends State<GameGalleryPage>
     return _listItem[index];
   }
 
+  void _openFilePicker() {
+    setState(() {
+      _isFilePickerOpen = true;
+    });
+  }
+
+  void _closeFilePicker() {
+    setState(() {
+      _isFilePickerOpen = false;
+    });
+  }
+
   void _selectCoverImage(
       void Function(PlatformFile? coverFile) onComplete) async {
+    _openFilePicker();
     FilePickerResult? result = await FilePicker.platform
         .pickFiles(dialogTitle: "Select cover image", type: FileType.image);
 
     onComplete(result?.files.single);
+
+    _closeFilePicker();
   }
 
   void _selectGameBinary(
       void Function(PlatformFile? binaryFile) onComplete) async {
+    _openFilePicker();
     FilePickerResult? result = await FilePicker.platform.pickFiles(
         dialogTitle: "Select game binary",
         type: FileType.custom,
         allowedExtensions: ['exe']);
 
     onComplete(result?.files.single);
+
+    _closeFilePicker();
   }
 
   Size _calcDisplaySize() {
@@ -682,67 +728,51 @@ class _GameGalleryPageState extends State<GameGalleryPage>
                             },
                           )),
                   if (_isDragging)
-                    Positioned.fill(
-                      child: Container(
-                          color: mcgpalette0Accent.withOpacity(0.8),
-                          child: const Align(
-                            alignment: Alignment.center,
-                            child: Text(
-                              "Drag and drop file to add new item",
-                              textScaleFactor: 1.5,
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          )),
-                    ),
+                    const GameGalleryPageOverlay(
+                        message: "Drag and drop file to add new item"),
                   if (_isGameRunning)
-                    Positioned.fill(
-                      child: Container(
-                          color: mcgpalette0Accent.withOpacity(0.8),
-                          child: const Align(
-                            alignment: Alignment.center,
-                            child: Text(
-                              "Game is running...",
-                              textScaleFactor: 1.5,
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          )),
-                    )
+                    const GameGalleryPageOverlay(
+                      message: "Game is running...",
+                    ),
+                  if (_isFilePickerOpen) const GameGalleryPageOverlay(),
                 ],
               ))),
-      floatingActionButton: ExpandableFab(distance: 112.0, children: [
-        ActionButton(
-          onPressed: () {
-            _selectGameBinary((binaryFile) {
-              if (binaryFile?.path != null) {
-                _selectCoverImage((coverFile) {
-                  if (coverFile?.path != null) {
-                    _addItem(GameGalleryData(
-                        executablePath: binaryFile?.path ?? '',
-                        coverPath: coverFile?.path ?? ''));
-                  } else {
-                    showErrno(context, Errno.pickerFileNotSelected);
-                  }
-                });
-              } else {
-                showErrno(context, Errno.pickerFileNotSelected);
-              }
-            });
-          },
-          icon: const Icon(Icons.add),
-        ),
-        ActionButton(
-          onPressed: () => showMessage(context, "FAB child 2"),
-          icon: const Icon(Icons.gamepad),
-        ),
-        ActionButton(
-          onPressed: () => showMessage(context, "FAB child 3"),
-          icon: const Icon(Icons.monitor),
-        ),
-        ActionButton(
-          onPressed: () => showMessage(context, "FAB child 3"),
-          icon: const Icon(Icons.monitor),
-        ),
-      ]),
+      floatingActionButton: _isFilePickerOpen
+          ? null
+          : ExpandableFab(distance: 112.0, children: [
+              ActionButton(
+                onPressed: () {
+                  _selectGameBinary((binaryFile) {
+                    if (binaryFile?.path != null) {
+                      _selectCoverImage((coverFile) {
+                        if (coverFile?.path != null) {
+                          _addItem(GameGalleryData(
+                              executablePath: binaryFile?.path ?? '',
+                              coverPath: coverFile?.path ?? ''));
+                        } else {
+                          showErrno(context, Errno.pickerFileNotSelected);
+                        }
+                      });
+                    } else {
+                      showErrno(context, Errno.pickerFileNotSelected);
+                    }
+                  });
+                },
+                icon: const Icon(Icons.add),
+              ),
+              ActionButton(
+                onPressed: () => showMessage(context, "FAB child 2"),
+                icon: const Icon(Icons.gamepad),
+              ),
+              ActionButton(
+                onPressed: () => showMessage(context, "FAB child 3"),
+                icon: const Icon(Icons.monitor),
+              ),
+              ActionButton(
+                onPressed: () => showMessage(context, "FAB child 3"),
+                icon: const Icon(Icons.discord),
+              ),
+            ]),
     );
   }
 }
