@@ -671,7 +671,7 @@ class _GameGalleryPageState extends State<GameGalleryPage>
                             key: GlobalObjectKey(_getItem(index)),
                             data: _getItem(index),
                             isSelected: _lastPosition == index,
-                            onTap: (data) {
+                            onPress: (data) {
                               setState(() {
                                 _lastPosition = index;
                               });
@@ -752,15 +752,17 @@ class GameGalleryItem extends StatefulWidget {
       {super.key,
       required this.data,
       required this.isSelected,
-      this.onTap,
+      this.onPress,
       this.onLongPress,
-      this.onHover});
+      this.onHover,
+      this.onScrollNeeded});
 
   final GameGalleryData data;
   final bool isSelected;
-  final Function(GameGalleryData)? onTap;
+  final Function(GameGalleryData)? onPress;
   final Function(GameGalleryData)? onLongPress;
   final Function(GameGalleryData)? onHover;
+  final Function(BuildContext)? onScrollNeeded;
 
   @override
   State<GameGalleryItem> createState() => _GameGalleryItemState();
@@ -769,6 +771,8 @@ class GameGalleryItem extends StatefulWidget {
 class _GameGalleryItemState extends State<GameGalleryItem> {
   @override
   Widget build(BuildContext context) {
+    this.activate();
+
     return Material(
         elevation: 8.0,
         color: mcgpalette0Accent,
@@ -781,7 +785,7 @@ class _GameGalleryItemState extends State<GameGalleryItem> {
                   spreadRadius: 0.0)
             ]),
             child: InkWell(
-              onTap: () => widget.onTap?.call(widget.data),
+              onTap: () => widget.onPress?.call(widget.data),
               onLongPress: () => widget.onLongPress?.call(widget.data),
               onHover: (isHover) =>
                   isHover ? widget.onHover?.call(widget.data) : null,
