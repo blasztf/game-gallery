@@ -44,3 +44,10 @@ app.*.map.json
 /android/app/release
 
 /lib/test.dart
+/.vscode/
+/android/
+/ios/
+/windows/
+/linux/
+/macos/
+/web/
