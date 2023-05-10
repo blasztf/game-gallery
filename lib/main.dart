@@ -613,7 +613,18 @@ class _GameGalleryPageState extends State<GameGalleryPage>
     setState(() {
       _isGameRunning = true;
     });
+
+    var startTime = DateTime.now();
     game.start((gamePid) {
+      var playDuration =
+          DateTimeRange(start: startTime, end: DateTime.now()).duration;
+
+      showMessage(context,
+          "You have been playing for ${playDuration.inMinutes} minutes.");
+
+      // showMessage(context,
+      //     "You have been playing for ${playDuration.inHours} hours ${playDuration.inMinutes} minutes ${playDuration.inSeconds} seconds");
+
       setState(() {
         _isGameRunning = false;
       });
@@ -801,8 +812,6 @@ class GameGalleryItem extends StatefulWidget {
 class _GameGalleryItemState extends State<GameGalleryItem> {
   @override
   Widget build(BuildContext context) {
-    this.activate();
-
     return Material(
         elevation: 8.0,
         color: mcgpalette0Accent,
