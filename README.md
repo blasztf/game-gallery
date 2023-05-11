@@ -1,6 +1,6 @@
-# game_gallery
+# Game Gallery
 
-A new Flutter project.
+Make gallery for standalone game.
 
 ## Getting Started
 

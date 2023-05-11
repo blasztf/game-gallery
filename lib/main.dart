@@ -102,6 +102,9 @@ void showErrno(BuildContext context, Errno errno) {
 void showMessage(BuildContext context, String message) => showDialog(
     context: context,
     builder: (context) => AlertDialog(
+          backgroundColor: mcgpalette0,
+          titleTextStyle: const TextStyle(color: Colors.white70),
+          contentTextStyle: const TextStyle(color: Colors.white70),
           content: Text(message),
         ));
 
@@ -496,10 +499,23 @@ class _GameGalleryPageState extends State<GameGalleryPage>
   final Controller _gamepadController = Controller(index: 0);
   final ScrollController _scrollController = ScrollController();
 
-  void _scrollTo(int index) {
+  // void _scrollTo2(int index) {
+  //   try {
+  //     Scrollable.ensureVisible(GlobalObjectKey(_getItem(index)).currentContext!,
+  //         alignment: .5);
+  //     // ignore: empty_catches
+  //   } catch (e) {}
+  // }
+
+  void _scroll(int from, int to) {
     try {
-      Scrollable.ensureVisible(GlobalObjectKey(_getItem(index)).currentContext!,
-          alignment: .5);
+      var context = GlobalObjectKey(_getItem(from)).currentContext!;
+      double offset =
+          ((to ~/ _crossAxisCount)).floor() * (context.size?.height ?? 0);
+      _scrollController.animateTo(offset,
+          duration: const Duration(seconds: 1), curve: Curves.decelerate);
+      // print(context.size?.height);
+      print(offset);
       // ignore: empty_catches
     } catch (e) {}
   }
@@ -543,10 +559,10 @@ class _GameGalleryPageState extends State<GameGalleryPage>
     }
 
     if (_lastPosition != newPosition) {
+      _scroll(_lastPosition, newPosition);
       setState(() {
         _lastPosition = newPosition;
       });
-      _scrollTo(_lastPosition);
     }
   }
 
@@ -613,7 +629,20 @@ class _GameGalleryPageState extends State<GameGalleryPage>
     setState(() {
       _isGameRunning = true;
     });
+
+    var startTime = DateTime.now();
     game.start((gamePid) {
+      var playDuration = DateTimeRange(start: startTime, end: DateTime.now())
+          .duration
+          .inSeconds;
+
+      var playHours = playDuration ~/ 3600;
+      var playMinutes = (playDuration - playHours * 3600) ~/ 60;
+      var playSeconds = playDuration - (playHours * 3600) - (playMinutes * 60);
+
+      showMessage(context,
+          "You have been playing for $playHours hours $playMinutes minutes $playSeconds seconds.");
+
       setState(() {
         _isGameRunning = false;
       });
@@ -714,7 +743,9 @@ class _GameGalleryPageState extends State<GameGalleryPage>
                       itemCount: _sizeItem,
                       itemBuilder: (BuildContext context, int index) =>
                           GameGalleryItem(
-                            key: GlobalObjectKey(_getItem(index)),
+                            key: _lastPosition == index
+                                ? GlobalObjectKey(_getItem(index))
+                                : null,
                             data: _getItem(index),
                             isSelected: _lastPosition == index,
                             onPress: (data) {
@@ -726,6 +757,7 @@ class _GameGalleryPageState extends State<GameGalleryPage>
                             onLongPress: (data) {
                               _removeItem(data);
                             },
+                            onScrollNeeded: (context) => print(context.size),
                           )),
                   if (_isDragging)
                     const GameGalleryPageOverlay(
@@ -801,8 +833,6 @@ class GameGalleryItem extends StatefulWidget {
 class _GameGalleryItemState extends State<GameGalleryItem> {
   @override
   Widget build(BuildContext context) {
-    this.activate();
-
     return Material(
         elevation: 8.0,
         color: mcgpalette0Accent,
@@ -812,7 +842,7 @@ class _GameGalleryItemState extends State<GameGalleryItem> {
                   color: Colors.amber.shade900
                       .withAlpha(widget.isSelected ? 255 : 0),
                   blurRadius: 6.0,
-                  spreadRadius: 0.0)
+                  spreadRadius: 3.0)
             ]),
             child: InkWell(
               onTap: () => widget.onPress?.call(widget.data),
