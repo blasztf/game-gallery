@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
@@ -15,9 +16,8 @@ import 'dart:math';
 void main() {
   runApp(const GameGalleryApp());
   doWhenWindowReady(() {
-    const initialSize = Size(400, 640);
-    appWindow.minSize = initialSize;
-    appWindow.size = initialSize;
+    appWindow.minSize = const Size(480, 640);
+    appWindow.size = const Size(640, 480);
     appWindow.alignment = Alignment.center;
     appWindow.show();
   });
@@ -442,6 +442,56 @@ class GameGalleryApp extends StatelessWidget {
   }
 }
 
+class GameGalleryFormDialog extends StatefulWidget {
+  const GameGalleryFormDialog(
+      {super.key,
+      this.onSubmit,
+      this.children,
+      required this.titleText,
+      required this.submitText});
+
+  final Function(HashMap<String, String>)? onSubmit;
+  final List<Widget> Function(HashMap<String, String?>)? children;
+  final String titleText;
+  final String submitText;
+
+  @override
+  State<StatefulWidget> createState() => _GameGaleryFormDialogState();
+}
+
+class _GameGaleryFormDialogState extends State<GameGalleryFormDialog> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final HashMap<String, String> _data = HashMap();
+
+  @override
+  Widget build(BuildContext context) {
+    return Theme(
+      data: Theme.of(context),
+      child: AlertDialog(
+        title: Text(widget.titleText),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              if (_formKey.currentState!.validate()) {
+                _formKey.currentState!.save();
+                widget.onSubmit?.call(_data);
+              }
+            },
+            child: Text(widget.submitText),
+          )
+        ],
+        content: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: widget.children?.call(_data) ?? [],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class GameGalleryPageOverlay extends StatefulWidget {
   const GameGalleryPageOverlay({super.key, this.message = ""});
 
@@ -492,8 +542,10 @@ class _GameGalleryPageState extends State<GameGalleryPage>
   final int _overlayFilePickerOpening = 4;
   final int _overlayFileDragging = 8;
 
+  final double _spacing = 25.0;
+
   int get _sizeItem => _listItem.length;
-  int get _crossAxisCount => _lastSize.width > 1920
+  int get _crossAxisCount => _lastSize.width > 1440
       ? 8
       : _lastSize.width > 960
           ? 6
@@ -506,15 +558,17 @@ class _GameGalleryPageState extends State<GameGalleryPage>
   final Controller _gamepadController = Controller(index: 0);
   final ScrollController _scrollController = ScrollController();
 
-  void _scroll(int from, int to) {
+  bool _scroll(int from, int to) {
     try {
       var context = GlobalObjectKey(_getItem(from)).currentContext!;
       double offset =
-          ((to ~/ _crossAxisCount)).floor() * (context.size?.height ?? 0);
+          ((to ~/ _crossAxisCount)).floor() * (context.size!.height + _spacing);
       _scrollController.animateTo(offset,
           duration: const Duration(seconds: 1), curve: Curves.decelerate);
-      // ignore: empty_catches
-    } catch (e) {}
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   int _movePointerUp() {
@@ -557,8 +611,7 @@ class _GameGalleryPageState extends State<GameGalleryPage>
       default:
     }
 
-    if (_lastPosition != newPosition) {
-      _scroll(_lastPosition, newPosition);
+    if (_lastPosition != newPosition && _scroll(_lastPosition, newPosition)) {
       setState(() {
         _lastPosition = newPosition;
       });
@@ -743,9 +796,9 @@ class _GameGalleryPageState extends State<GameGalleryPage>
                     children: [
                       AlignedGridView.count(
                           controller: _scrollController,
-                          padding: const EdgeInsets.all(25.0),
-                          mainAxisSpacing: 25.0,
-                          crossAxisSpacing: 50.0,
+                          padding: EdgeInsets.all(_spacing),
+                          mainAxisSpacing: _spacing,
+                          crossAxisSpacing: _spacing,
                           crossAxisCount: _crossAxisCount,
                           itemCount: _sizeItem,
                           itemBuilder: (BuildContext context, int index) =>
@@ -781,21 +834,70 @@ class _GameGalleryPageState extends State<GameGalleryPage>
           floatingActionButton: ExpandableFab(distance: 112.0, children: [
             ActionButton(
               onPressed: () {
-                _selectGameBinary((binaryFile) {
-                  if (binaryFile?.path != null) {
-                    _selectCoverImage((coverFile) {
-                      if (coverFile?.path != null) {
-                        _addItem(GameGalleryData(
-                            executablePath: binaryFile?.path ?? '',
-                            coverPath: coverFile?.path ?? ''));
-                      } else {
-                        showErrno(context, Errno.pickerFileNotSelected);
-                      }
+                TextEditingController executableTextController =
+                    TextEditingController();
+                TextEditingController artworkTextController =
+                    TextEditingController();
+                showDialog(
+                    context: context,
+                    builder: (builderContext) {
+                      return AbsorbPointer(
+                        absorbing: !_isActive,
+                        child: GameGalleryFormDialog(
+                          titleText: "Add new game",
+                          submitText: "Add",
+                          children: (data) => <Widget>[
+                            TextFormField(
+                              controller: executableTextController,
+                              onTap: () {
+                                _selectGameBinary((binaryFile) {
+                                  try {
+                                    executableTextController.text =
+                                        binaryFile!.path!;
+                                    data['executablePath'] =
+                                        executableTextController.text;
+                                  } catch (e) {
+                                    showErrno(
+                                        context, Errno.pickerFileNotSelected);
+                                  }
+                                });
+                              },
+                              decoration: const InputDecoration(
+                                  hintText: "Click to select executable..."),
+                            ),
+                            TextFormField(
+                              controller: artworkTextController,
+                              onTap: () {
+                                _selectCoverImage((coverFile) {
+                                  try {
+                                    artworkTextController.text =
+                                        coverFile!.path!;
+                                    data['artworkPath'] =
+                                        artworkTextController.text;
+                                  } catch (e) {
+                                    showErrno(
+                                        context, Errno.pickerFileNotSelected);
+                                  }
+                                });
+                              },
+                              decoration: const InputDecoration(
+                                  hintText: "Click to select artwork..."),
+                            )
+                          ],
+                          onSubmit: (data) {
+                            try {
+                              _addItem(GameGalleryData(
+                                  executablePath: data['executablePath']!,
+                                  coverPath: data['artworkPath']!));
+                            } catch (e) {
+                              showErrno(context, Errno.pickerFileNotSelected);
+                            } finally {
+                              Navigator.pop(context);
+                            }
+                          },
+                        ),
+                      );
                     });
-                  } else {
-                    showErrno(context, Errno.pickerFileNotSelected);
-                  }
-                });
               },
               icon: const Icon(Icons.add),
             ),
@@ -806,10 +908,6 @@ class _GameGalleryPageState extends State<GameGalleryPage>
             ActionButton(
               onPressed: () => _startGame(_getItem(_lastPosition)),
               icon: const Icon(Icons.play_arrow),
-            ),
-            ActionButton(
-              onPressed: () => _startGame(_getItem(_lastPosition)),
-              icon: const Icon(Icons.video_call),
             ),
           ]),
         ));
