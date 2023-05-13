@@ -99,14 +99,17 @@ void showErrno(BuildContext context, Errno errno) {
           ));
 }
 
-void showMessage(BuildContext context, String message) => showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-          backgroundColor: mcgpalette0,
-          titleTextStyle: const TextStyle(color: Colors.white70),
-          contentTextStyle: const TextStyle(color: Colors.white70),
-          content: Text(message),
-        ));
+Future showMessage(BuildContext context, String message) async {
+  ThemeData theme = Theme.of(context);
+  return await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+            backgroundColor: theme.primaryColor,
+            titleTextStyle: theme.primaryTextTheme.titleMedium,
+            contentTextStyle: theme.primaryTextTheme.bodyMedium,
+            content: Text(message),
+          ));
+}
 
 class WindowButtons extends StatelessWidget {
   const WindowButtons({Key? key}) : super(key: key);
@@ -478,12 +481,16 @@ class GameGalleryPage extends StatefulWidget {
 class _GameGalleryPageState extends State<GameGalleryPage>
     with WidgetsBindingObserver, WindowListener {
   late Size _lastSize;
-  bool _isDragging = false;
   List<GameGalleryData> _listItem = [];
 
   int _lastPosition = 0;
-  bool _isGameRunning = false;
-  bool _isFilePickerOpen = false;
+  bool _isActive = true;
+
+  int _overlayState = 0;
+  final int _overlayEnabled = 1;
+  final int _overlayGameRunning = 2;
+  final int _overlayFilePickerOpening = 4;
+  final int _overlayFileDragging = 8;
 
   int get _sizeItem => _listItem.length;
   int get _crossAxisCount => _lastSize.width > 1920
@@ -499,14 +506,6 @@ class _GameGalleryPageState extends State<GameGalleryPage>
   final Controller _gamepadController = Controller(index: 0);
   final ScrollController _scrollController = ScrollController();
 
-  // void _scrollTo2(int index) {
-  //   try {
-  //     Scrollable.ensureVisible(GlobalObjectKey(_getItem(index)).currentContext!,
-  //         alignment: .5);
-  //     // ignore: empty_catches
-  //   } catch (e) {}
-  // }
-
   void _scroll(int from, int to) {
     try {
       var context = GlobalObjectKey(_getItem(from)).currentContext!;
@@ -514,8 +513,6 @@ class _GameGalleryPageState extends State<GameGalleryPage>
           ((to ~/ _crossAxisCount)).floor() * (context.size?.height ?? 0);
       _scrollController.animateTo(offset,
           duration: const Duration(seconds: 1), curve: Curves.decelerate);
-      // print(context.size?.height);
-      print(offset);
       // ignore: empty_catches
     } catch (e) {}
   }
@@ -541,6 +538,8 @@ class _GameGalleryPageState extends State<GameGalleryPage>
   }
 
   void _movePointer(String key) {
+    if (!_isActive) return;
+
     int newPosition = _lastPosition;
     switch (key) {
       case 'up':
@@ -586,13 +585,15 @@ class _GameGalleryPageState extends State<GameGalleryPage>
 
   void _openFilePicker() {
     setState(() {
-      _isFilePickerOpen = true;
+      _overlayState = _overlayEnabled | _overlayFilePickerOpening;
+      _isActive = false;
     });
   }
 
   void _closeFilePicker() {
     setState(() {
-      _isFilePickerOpen = false;
+      _overlayState = 0;
+      _isActive = true;
     });
   }
 
@@ -627,7 +628,8 @@ class _GameGalleryPageState extends State<GameGalleryPage>
 
   void _startGame(GameGalleryData game) {
     setState(() {
-      _isGameRunning = true;
+      _overlayState = _overlayEnabled | _overlayGameRunning;
+      _isActive = false;
     });
 
     var startTime = DateTime.now();
@@ -641,10 +643,13 @@ class _GameGalleryPageState extends State<GameGalleryPage>
       var playSeconds = playDuration - (playHours * 3600) - (playMinutes * 60);
 
       showMessage(context,
-          "You have been playing for $playHours hours $playMinutes minutes $playSeconds seconds.");
+              "You have been playing for $playHours hours $playMinutes minutes $playSeconds seconds.")
+          .then((value) => setState(() {
+                _isActive = true;
+              }));
 
       setState(() {
-        _isGameRunning = false;
+        _overlayState = 0;
       });
     });
   }
@@ -703,109 +708,111 @@ class _GameGalleryPageState extends State<GameGalleryPage>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: DropTarget(
-          onDragDone: (detail) {
-            if (detail.files.length > 1) {
-              showErrno(context, Errno.dragAndDropMultipleItems);
-            } else {
-              _selectCoverImage((coverFile) {
-                if (coverFile?.path != null) {
-                  _addItem(GameGalleryData(
-                      executablePath: detail.files[0].path,
-                      coverPath: coverFile?.path ?? ''));
+    return AbsorbPointer(
+        absorbing: !_isActive,
+        child: Scaffold(
+          body: DropTarget(
+              onDragDone: (detail) {
+                if (detail.files.length > 1) {
+                  showErrno(context, Errno.dragAndDropMultipleItems);
                 } else {
-                  showErrno(context, Errno.pickerFileNotSelected);
-                }
-              });
-            }
-          },
-          onDragEntered: (detail) {
-            setState(() {
-              _isDragging = true;
-            });
-          },
-          onDragExited: (detail) {
-            setState(() {
-              _isDragging = false;
-            });
-          },
-          child: Container(
-              color: mcgpalette0Accent,
-              child: Stack(
-                children: [
-                  AlignedGridView.count(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.all(25.0),
-                      mainAxisSpacing: 25.0,
-                      crossAxisSpacing: 50.0,
-                      crossAxisCount: _crossAxisCount,
-                      itemCount: _sizeItem,
-                      itemBuilder: (BuildContext context, int index) =>
-                          GameGalleryItem(
-                            key: _lastPosition == index
-                                ? GlobalObjectKey(_getItem(index))
-                                : null,
-                            data: _getItem(index),
-                            isSelected: _lastPosition == index,
-                            onPress: (data) {
-                              setState(() {
-                                _lastPosition = index;
-                              });
-                              _startGame(data);
-                            },
-                            onLongPress: (data) {
-                              _removeItem(data);
-                            },
-                            onScrollNeeded: (context) => print(context.size),
-                          )),
-                  if (_isDragging)
-                    const GameGalleryPageOverlay(
-                        message: "Drag and drop file to add new item"),
-                  if (_isGameRunning)
-                    const GameGalleryPageOverlay(
-                      message: "Game is running...",
-                    ),
-                  if (_isFilePickerOpen) const GameGalleryPageOverlay(),
-                ],
-              ))),
-      floatingActionButton: _isFilePickerOpen
-          ? null
-          : ExpandableFab(distance: 112.0, children: [
-              ActionButton(
-                onPressed: () {
-                  _selectGameBinary((binaryFile) {
-                    if (binaryFile?.path != null) {
-                      _selectCoverImage((coverFile) {
-                        if (coverFile?.path != null) {
-                          _addItem(GameGalleryData(
-                              executablePath: binaryFile?.path ?? '',
-                              coverPath: coverFile?.path ?? ''));
-                        } else {
-                          showErrno(context, Errno.pickerFileNotSelected);
-                        }
-                      });
+                  _selectCoverImage((coverFile) {
+                    if (coverFile?.path != null) {
+                      _addItem(GameGalleryData(
+                          executablePath: detail.files[0].path,
+                          coverPath: coverFile?.path ?? ''));
                     } else {
                       showErrno(context, Errno.pickerFileNotSelected);
                     }
                   });
-                },
-                icon: const Icon(Icons.add),
-              ),
-              ActionButton(
-                onPressed: () => showMessage(context, "FAB child 2"),
-                icon: const Icon(Icons.gamepad),
-              ),
-              ActionButton(
-                onPressed: () => showMessage(context, "FAB child 3"),
-                icon: const Icon(Icons.monitor),
-              ),
-              ActionButton(
-                onPressed: () => showMessage(context, "FAB child 3"),
-                icon: const Icon(Icons.discord),
-              ),
-            ]),
-    );
+                }
+              },
+              onDragEntered: (detail) {
+                setState(() {
+                  _overlayState = _overlayEnabled | _overlayFileDragging;
+                });
+              },
+              onDragExited: (detail) {
+                setState(() {
+                  _overlayState = 0;
+                });
+              },
+              child: Container(
+                  color: mcgpalette0Accent,
+                  child: Stack(
+                    children: [
+                      AlignedGridView.count(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.all(25.0),
+                          mainAxisSpacing: 25.0,
+                          crossAxisSpacing: 50.0,
+                          crossAxisCount: _crossAxisCount,
+                          itemCount: _sizeItem,
+                          itemBuilder: (BuildContext context, int index) =>
+                              GameGalleryItem(
+                                key: _lastPosition == index
+                                    ? GlobalObjectKey(_getItem(index))
+                                    : null,
+                                data: _getItem(index),
+                                isSelected: _lastPosition == index,
+                                onPress: (data) {
+                                  setState(() {
+                                    _lastPosition = index;
+                                  });
+                                },
+                                onLongPress: (data) {
+                                  setState(() {
+                                    _lastPosition = index;
+                                  });
+                                },
+                              )),
+                      if (_overlayState & _overlayEnabled != 0)
+                        GameGalleryPageOverlay(
+                          message: _overlayState & _overlayFileDragging != 0
+                              ? "Drag and drop file to add new item"
+                              : _overlayState & _overlayFilePickerOpening != 0
+                                  ? "Pick a file..."
+                                  : _overlayState & _overlayGameRunning != 0
+                                      ? "Game is running..."
+                                      : "",
+                        )
+                    ],
+                  ))),
+          floatingActionButton: ExpandableFab(distance: 112.0, children: [
+            ActionButton(
+              onPressed: () {
+                _selectGameBinary((binaryFile) {
+                  if (binaryFile?.path != null) {
+                    _selectCoverImage((coverFile) {
+                      if (coverFile?.path != null) {
+                        _addItem(GameGalleryData(
+                            executablePath: binaryFile?.path ?? '',
+                            coverPath: coverFile?.path ?? ''));
+                      } else {
+                        showErrno(context, Errno.pickerFileNotSelected);
+                      }
+                    });
+                  } else {
+                    showErrno(context, Errno.pickerFileNotSelected);
+                  }
+                });
+              },
+              icon: const Icon(Icons.add),
+            ),
+            ActionButton(
+              onPressed: () => _removeItem(_getItem(_lastPosition)),
+              icon: const Icon(Icons.remove),
+            ),
+            ActionButton(
+              onPressed: () => _startGame(_getItem(_lastPosition)),
+              icon: const Icon(Icons.play_arrow),
+            ),
+            ActionButton(
+              onPressed: () => _startGame(_getItem(_lastPosition)),
+              icon: const Icon(Icons.video_call),
+            ),
+          ]),
+        ));
   }
 }
 
@@ -816,15 +823,13 @@ class GameGalleryItem extends StatefulWidget {
       required this.isSelected,
       this.onPress,
       this.onLongPress,
-      this.onHover,
-      this.onScrollNeeded});
+      this.onHover});
 
   final GameGalleryData data;
   final bool isSelected;
   final Function(GameGalleryData)? onPress;
   final Function(GameGalleryData)? onLongPress;
   final Function(GameGalleryData)? onHover;
-  final Function(BuildContext)? onScrollNeeded;
 
   @override
   State<GameGalleryItem> createState() => _GameGalleryItemState();
