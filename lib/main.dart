@@ -112,7 +112,10 @@ Future showMessage(BuildContext context, String message) async {
 }
 
 class WindowButtons extends StatelessWidget {
-  const WindowButtons({Key? key}) : super(key: key);
+  WindowButtons({Key? key}) : super(key: key);
+
+  bool isFullscreen = false;
+
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -432,7 +435,7 @@ class GameGalleryApp extends StatelessWidget {
                         ],
                         tileMode: TileMode.clamp)),
                 child: MoveWindow()),
-            actions: const [WindowButtons()],
+            actions: [WindowButtons()],
             title: Text(title),
           ),
           body: const GameGalleryPage(
@@ -841,8 +844,8 @@ class _GameGalleryPageState extends State<GameGalleryPage>
                 showDialog(
                     context: context,
                     builder: (builderContext) {
-                      return AbsorbPointer(
-                        absorbing: !_isActive,
+                      return IgnorePointer(
+                        ignoring: !_isActive,
                         child: GameGalleryFormDialog(
                           titleText: "Add new game",
                           submitText: "Add",
@@ -902,7 +905,27 @@ class _GameGalleryPageState extends State<GameGalleryPage>
               icon: const Icon(Icons.add),
             ),
             ActionButton(
-              onPressed: () => _removeItem(_getItem(_lastPosition)),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    content: const Text("Do you want to remove this game?"),
+                    actions: [
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text("No"),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          _removeItem(_getItem(_lastPosition));
+                          Navigator.pop(context);
+                        },
+                        child: const Text("Yes"),
+                      )
+                    ],
+                  ),
+                );
+              },
               icon: const Icon(Icons.remove),
             ),
             ActionButton(
