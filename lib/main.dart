@@ -20,8 +20,8 @@ void main() {
 
 void prepareWorkingDirectory() {
   String dir = join(Directory.current.path, 'images');
-  File(join(dir, 'artwork')).createSync(recursive: true);
-  File(join(dir, 'banner')).createSync(recursive: true);
-  File(join(dir, 'big_picture')).createSync(recursive: true);
-  File(join(dir, 'logo')).createSync(recursive: true);
+  Directory(join(dir, 'artwork')).createSync(recursive: true);
+  Directory(join(dir, 'banner')).createSync(recursive: true);
+  Directory(join(dir, 'big_picture')).createSync(recursive: true);
+  Directory(join(dir, 'logo')).createSync(recursive: true);
 }
