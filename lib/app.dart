@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:game_gallery/data.dart';
 import 'package:game_gallery/page.dart';
 import 'package:game_gallery/style.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 final buttonColors = WindowButtonColors(
     mouseOver: mcgpalette0Accent.shade500,
@@ -40,11 +41,11 @@ class GameGalleryApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    ThemeData theme = ThemeData(primarySwatch: mcgpalette0);
-    theme = theme.copyWith(
-        colorScheme: theme.colorScheme.copyWith(secondary: mcgpalette0Accent));
     return MaterialApp(
-        theme: theme,
+        theme: ThemeData(
+            primarySwatch: mcgpalette0,
+            colorScheme: ColorScheme.fromSwatch(primarySwatch: mcgpalette0)
+                .copyWith(secondary: mcgpalette0Accent)),
         home: Scaffold(
           appBar: AppBar(
             flexibleSpace: Container(
@@ -61,8 +62,8 @@ class GameGalleryApp extends StatelessWidget {
             actions: const [WindowButtons()],
             title: Text(title),
           ),
-          body: const GameGalleryPage(
-            storage: GameGalleryStorage(),
+          body: GameGalleryPage(
+            database: GameObjectDatabase(databaseFactoryFfi),
           ),
         ));
   }

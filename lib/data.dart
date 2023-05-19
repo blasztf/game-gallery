@@ -1,81 +1,173 @@
-import 'dart:convert';
-import 'dart:io';
+import 'dart:collection';
+import 'dart:io' show Process, ProcessResult;
 
-import 'package:path_provider/path_provider.dart';
+import 'package:flutter/material.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-class Config {
-  static final String dataJsonPath =
-      "Game_Gallery${Platform.pathSeparator}data.json";
-}
+class Bundle {
+  final Map<String, Object> _bundle = HashMap();
 
-class GameGalleryStorage {
-  const GameGalleryStorage();
-
-  Future<String> get _localPath async {
-    final directory = await getApplicationDocumentsDirectory();
-    return directory.path;
+  int getInt(String key) {
+    return _bundle[key] as int;
   }
 
-  Future<File> get _localFile async {
-    final path = await _localPath;
-    final dataJsonPath = Config.dataJsonPath;
-    return File('$path${Platform.pathSeparator}$dataJsonPath');
+  String getString(String key) {
+    return _bundle[key] as String;
   }
 
-  Future<List<GameGalleryData>> load() async {
-    try {
-      final File file = await _localFile;
-      final contents = await file.readAsString();
-      final parsed = jsonDecode(contents).cast<Map<String, dynamic>>();
-      return parsed
-          .map<GameGalleryData>((json) => GameGalleryData.fromJson(json))
-          .toList();
-    } catch (e) {
-      return [];
-    }
+  void putInt(String key, int value) {
+    _bundle[key] = value;
   }
 
-  Future<bool> save(List<GameGalleryData> data) async {
-    try {
-      final file = await _localFile;
-      final parsed = data.map((item) => GameGalleryData.toJson(item)).toList();
-      final String contents = jsonEncode(parsed);
+  void putString(String key, String value) {
+    _bundle[key] = value;
+  }
 
-      file.writeAsString(contents);
-      return true;
-    } catch (e) {
-      // If encountering an error, return 0
-      return false;
-    }
+  Map<String, Object> flatten() {
+    return HashMap.from(_bundle);
   }
 }
 
-class GameGalleryData {
-  final String executablePath;
-  final String coverPath;
+class PlayTime {
+  int _playHours = 0;
+  int _playMinutes = 0;
+  int _playSeconds = 0;
+  int _duration = 0;
 
-  static final GameGalleryData invalid =
-      GameGalleryData(executablePath: '', coverPath: '');
+  int get hours => _playHours;
+  int get minutes => _playMinutes;
+  int get seconds => _playSeconds;
 
-  static bool isValid(GameGalleryData data) => data == GameGalleryData.invalid;
-
-  GameGalleryData({required this.executablePath, required this.coverPath});
-
-  factory GameGalleryData.fromJson(Map<String, dynamic> json) {
-    return GameGalleryData(
-        executablePath: json['executablePath'] as String,
-        coverPath: json['coverPath'] as String);
+  PlayTime(duration) {
+    addDuration(duration);
   }
 
-  static Map<String, dynamic> toJson(GameGalleryData value) {
+  void addDuration(int duration) {
+    _duration += duration;
+    _parse();
+  }
+
+  int getDuration() {
+    return _duration;
+  }
+
+  void _parse() {
+    _playHours = _duration ~/ 3600;
+    _playMinutes = (_duration - _playHours * 3600) ~/ 60;
+    _playSeconds = _duration - (_playHours * 3600) - (_playMinutes * 60);
+  }
+}
+
+class GameObject {
+  final String title;
+  final String executable;
+  final String artwork;
+  final String bigPicture;
+  final String banner;
+  final String logo;
+  late final PlayTime playTime;
+  final int id;
+
+  GameObject(this.title, this.executable, this.artwork, this.bigPicture,
+      this.banner, this.logo, int duration,
+      {this.id = 0}) {
+    playTime = PlayTime(duration);
+  }
+
+  void play({Function(int)? callback}) async {
+    var startTime = DateTime.now();
+    ProcessResult p = await Process.run(executable, []);
+    var playDuration =
+        DateTimeRange(start: startTime, end: DateTime.now()).duration.inSeconds;
+    playTime.addDuration(playDuration);
+    callback?.call(p.pid);
+  }
+
+  Map<String, dynamic> transform() {
     return {
-      'executablePath': value.executablePath,
-      'coverPath': value.coverPath
+      if (id > 0) 'id': id,
+      'title': title,
+      'executable': executable,
+      'artwork': artwork,
+      'bigPicture': bigPicture,
+      'banner': banner,
+      'logo': logo,
+      'duration': playTime.getDuration()
     };
   }
 
-  void start(Function(int) callback) async {
-    ProcessResult p = await Process.run(executablePath, []);
-    callback(p.pid);
+  factory GameObject.build(Map<String, Object?> data) => GameObject(
+      data['title'] as String,
+      data['executable'] as String,
+      data['artwork'] as String,
+      data['bigPicture'] as String,
+      data['banner'] as String,
+      data['logo'] as String,
+      data['duration'] as int,
+      id: (data['id'] ?? 0) as int);
+}
+
+class GameObjectDatabase {
+  const GameObjectDatabase(this.dbFactory);
+
+  final DatabaseFactory dbFactory;
+  final String table = "Game";
+  final String dbPath = "game.db";
+
+  Future<Database> openDatabase() async {
+    return await dbFactory.openDatabase(dbPath,
+        options: OpenDatabaseOptions(
+          version: 1,
+          onCreate: (db, version) {
+            db.execute('''
+                  CREATE TABLE $table (
+                    id INTEGER PRIMARY KEY,
+                    title TEXT,
+                    executable TEXT,
+                    artwork TEXT,
+                    bigPicture TEXT,
+                    banner TEXT,
+                    logo TEXT,
+                    duration INTEGER
+                  )
+                  ''');
+          },
+        ));
+  }
+
+  Future<int> delete(List<GameObject> goCollection) async {
+    int result = 0;
+    Database db = await openDatabase();
+    for (GameObject go in goCollection) {
+      if (await db.delete(table, where: 'id = ?', whereArgs: [go.id]) != 0) {
+        result++;
+      }
+    }
+    db.close();
+    return result;
+  }
+
+  Future<int> save(List<GameObject> goCollection) async {
+    int result = 0;
+    Database db = await openDatabase();
+    for (GameObject go in goCollection) {
+      if (await db.insert(table, go.transform(),
+              conflictAlgorithm: ConflictAlgorithm.replace) !=
+          0) {
+        result++;
+      }
+    }
+    db.close();
+    return result;
+  }
+
+  Future<List<GameObject>> load() async {
+    List<GameObject> result;
+    Database db = await openDatabase();
+    result = (await db.query(table))
+        .map<GameObject>((data) => GameObject.build(data))
+        .toList();
+    db.close();
+    return result;
   }
 }

@@ -44,6 +44,8 @@ dependencies:
   path_provider: ^2.0.14
   xinput_gamepad: ^1.2.3
   window_manager: ^0.3.2
+  sqflite_common_ffi: ^2.2.5
+  crypto: ^3.0.3
 
 dev_dependencies:
   flutter_test:
