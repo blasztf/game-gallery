@@ -1,18 +1,10 @@
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:io'
-    show
-        Directory,
-        File,
-        FileMode,
-        HttpClient,
-        HttpClientRequest,
-        Process,
-        ProcessResult;
+    show Directory, File, FileMode, HttpClient, Process, ProcessResult;
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
-import 'package:game_gallery/data.dart';
 import 'package:path/path.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -124,10 +116,10 @@ class GameObjectDatabase {
 
   final DatabaseFactory dbFactory;
   final String table = "Game";
-  final String dbPath = "game.db";
+  final String dbGame = "game.db";
 
   Future<Database> openDatabase() async {
-    return await dbFactory.openDatabase(dbPath,
+    return await dbFactory.openDatabase(join(Directory.current.path, dbGame),
         options: OpenDatabaseOptions(
           version: 1,
           onCreate: (db, version) {
