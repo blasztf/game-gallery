@@ -46,6 +46,7 @@ dependencies:
   window_manager: ^0.3.2
   sqflite_common_ffi: ^2.2.5
   crypto: ^3.0.3
+  path: ^1.8.2
 
 dev_dependencies:
   flutter_test:

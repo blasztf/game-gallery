@@ -133,15 +133,22 @@ class _GameGalleryPageState extends State<GameGalleryPage>
     }
   }
 
-  void _addItem(final GameObject item) {
-    widget.database.save([item]);
+  void _addItem(final GameObject item) async {
+    var artwork = await ImageBucket.instance.putArtwork(item.artwork);
+    var banner = await ImageBucket.instance.putBanner(item.banner);
+    var bigPicture = await ImageBucket.instance.putBigPicture(item.bigPicture);
+    var logo = await ImageBucket.instance.putLogo(item.logo);
+
+    var newItem = GameObject(item.title, item.executable, artwork, bigPicture,
+        banner, logo, item.playTime.getDuration());
+    await widget.database.save([newItem]);
     setState(() {
       _listItem.add(item);
     });
   }
 
-  void _removeItem(final GameObject item) {
-    widget.database.delete([item]);
+  void _removeItem(final GameObject item) async {
+    await widget.database.delete([item]);
     setState(() {
       _listItem.remove(item);
     });

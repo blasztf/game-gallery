@@ -38,7 +38,9 @@ class GameGalleryItem extends StatelessWidget {
           onHover: (isHover) => isHover ? onHover?.call(data) : null,
           child: ClipRRect(
               borderRadius: BorderRadius.circular(8.0),
-              child: Image.file(fit: BoxFit.fill, File(data.artwork))),
+              child: Image.file(
+                  fit: BoxFit.fill,
+                  File(ImageBucket.instance.getArtwork(data.artwork)))),
         ),
       ),
     );
