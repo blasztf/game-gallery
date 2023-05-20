@@ -204,6 +204,7 @@ class ImageBucket {
   }
 
   Future<String> _put(String path, String type) async {
+    path = path.replaceAll(RegExp(r'(\?|\#).*'), '');
     String hashFilename = md5
             .convert(
                 utf8.encode("$path${DateTime.now().millisecondsSinceEpoch}"))

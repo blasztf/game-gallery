@@ -133,7 +133,7 @@ class _GameGalleryPageState extends State<GameGalleryPage>
     }
   }
 
-  void _addItem(final GameObject item) async {
+  Future<void> _addItem(final GameObject item) async {
     var artwork = await ImageBucket.instance.putArtwork(item.artwork);
     var banner = await ImageBucket.instance.putBanner(item.banner);
     var bigPicture = await ImageBucket.instance.putBigPicture(item.bigPicture);
@@ -143,7 +143,7 @@ class _GameGalleryPageState extends State<GameGalleryPage>
         banner, logo, item.playTime.getDuration());
     await widget.database.save([newItem]);
     setState(() {
-      _listItem.add(item);
+      _listItem.add(newItem);
     });
   }
 
@@ -228,9 +228,17 @@ class _GameGalleryPageState extends State<GameGalleryPage>
                 onCancel: () {
                   Navigator.pop(context);
                 },
-                onSubmit: (data) {
-                  _addItem(GameObject.build(data.flatten()));
-                  Navigator.pop(context);
+                onSubmit: (data) async {
+                  if (context.mounted) Navigator.pop(context);
+                  setState(() {
+                    _overlayState = _overlayEnabled;
+                    _isActive = false;
+                  });
+                  await _addItem(GameObject.build(data.flatten()));
+                  setState(() {
+                    _overlayState = 0;
+                    _isActive = true;
+                  });
                 },
               ),
             ),
