@@ -277,6 +277,7 @@ class FileSaver {
     var httpRequest = await httpClient.getUrl(url);
     var httpResponse = await httpRequest.close();
     var filename = as.isEmpty ? basename(path) : as;
+    filename = filename.replaceAll(RegExp(r'(\?|\#).*'), '');
     var file = File(join(dstPath, filename));
     try {
       await httpResponse.forEach((bytes) {
