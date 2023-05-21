@@ -166,8 +166,7 @@ class _GameGalleryPageState extends State<GameGalleryPage>
 
     setState(() {
       _listItem.remove(item);
-      _lastPosition =
-          _lastPosition == 0 ? _lastPosition + 1 : _lastPosition - 1;
+      _lastPosition = _lastPosition > 0 ? _lastPosition - 1 : 0;
       _overlayState = 0;
       _isActive = true;
     });
