@@ -306,85 +306,87 @@ class _GameGalleryPageState extends State<GameGalleryPage>
   @override
   Widget build(BuildContext context) {
     return AbsorbPointer(
-        absorbing: !_isActive,
-        child: Scaffold(
-          body: DropTarget(
-            onDragDone: (detail) {
-              if (detail.files.length > 1) {
-                showErrno(context, Errno.dragAndDropMultipleItems);
-              } else {
-                Bundle initialValue = Bundle();
-                initialValue.putString('executable', detail.files[0].path);
-                _showDialogAddForm(initialValue: initialValue);
-              }
-            },
-            onDragEntered: (detail) {
-              setState(() {
-                _overlayState = _overlayEnabled | _overlayFileDragging;
-              });
-            },
-            onDragExited: (detail) {
-              setState(() {
-                _overlayState = 0;
-              });
-            },
-            child: Container(
-              color: mcgpalette0Accent,
-              child: Stack(
-                children: [
-                  AlignedGridView.count(
-                      controller: _scrollController,
-                      padding: EdgeInsets.all(_spacing),
-                      mainAxisSpacing: _spacing,
-                      crossAxisSpacing: _spacing,
-                      crossAxisCount: _crossAxisCount,
-                      itemCount: _sizeItem,
-                      itemBuilder: (BuildContext context, int index) =>
-                          GameGalleryItem(
-                            key: _lastPosition == index
-                                ? GlobalObjectKey(_getItem(index))
-                                : null,
-                            data: _getItem(index),
-                            isSelected: _lastPosition == index,
-                            onPress: (data) {
-                              setState(() {
-                                _lastPosition = index;
-                              });
-                            },
-                            onLongPress: (data) {
-                              setState(() {
-                                _lastPosition = index;
-                              });
-                            },
-                          )),
-                  if (_overlayState & _overlayEnabled != 0)
-                    GameGalleryPageOverlay(
-                      message: _overlayState & _overlayFileDragging != 0
-                          ? "Drag and drop file to add new item"
-                          : _overlayState & _overlayFilePickerOpening != 0
-                              ? "Pick a file..."
-                              : _overlayState & _overlayGameRunning != 0
-                                  ? "Game is running..."
-                                  : "",
-                    )
-                ],
+      absorbing: !_isActive,
+      child: Stack(
+        children: [
+          Scaffold(
+            body: DropTarget(
+              onDragDone: (detail) {
+                if (detail.files.length > 1) {
+                  showErrno(context, Errno.dragAndDropMultipleItems);
+                } else {
+                  Bundle initialValue = Bundle();
+                  initialValue.putString('executable', detail.files[0].path);
+                  _showDialogAddForm(initialValue: initialValue);
+                }
+              },
+              onDragEntered: (detail) {
+                setState(() {
+                  _overlayState = _overlayEnabled | _overlayFileDragging;
+                });
+              },
+              onDragExited: (detail) {
+                setState(() {
+                  _overlayState = 0;
+                });
+              },
+              child: Container(
+                color: mcgpalette0Accent,
+                child: AlignedGridView.count(
+                  controller: _scrollController,
+                  padding: EdgeInsets.all(_spacing),
+                  mainAxisSpacing: _spacing,
+                  crossAxisSpacing: _spacing,
+                  crossAxisCount: _crossAxisCount,
+                  itemCount: _sizeItem,
+                  itemBuilder: (BuildContext context, int index) =>
+                      GameGalleryItem(
+                    key: _lastPosition == index
+                        ? GlobalObjectKey(_getItem(index))
+                        : null,
+                    data: _getItem(index),
+                    isSelected: _lastPosition == index,
+                    onPress: (data) {
+                      setState(() {
+                        _lastPosition = index;
+                      });
+                    },
+                    onLongPress: (data) {
+                      setState(() {
+                        _lastPosition = index;
+                      });
+                    },
+                  ),
+                ),
               ),
             ),
+            floatingActionButton: ExpandableFab(distance: 112.0, children: [
+              ActionButton(
+                onPressed: _showDialogAddForm,
+                icon: const Icon(Icons.add),
+              ),
+              ActionButton(
+                onPressed: _showDialogRemoveItem,
+                icon: const Icon(Icons.remove),
+              ),
+              ActionButton(
+                onPressed: () => _startGame(_getItem(_lastPosition)),
+                icon: const Icon(Icons.play_arrow),
+              ),
+            ]),
           ),
-          floatingActionButton: ExpandableFab(distance: 112.0, children: [
-            ActionButton(
-              onPressed: _showDialogAddForm,
-              icon: const Icon(Icons.add),
-            ),
-            ActionButton(
-              onPressed: _showDialogRemoveItem,
-              icon: const Icon(Icons.remove),
-            ),
-            ActionButton(
-              onPressed: () => _startGame(_getItem(_lastPosition)),
-              icon: const Icon(Icons.play_arrow),
-            ),
-          ]),
-        ));
+          if (_overlayState & _overlayEnabled != 0)
+            GameGalleryPageOverlay(
+              message: _overlayState & _overlayFileDragging != 0
+                  ? "Drag and drop file to add new item"
+                  : _overlayState & _overlayFilePickerOpening != 0
+                      ? "Pick a file..."
+                      : _overlayState & _overlayGameRunning != 0
+                          ? "Game is running..."
+                          : "",
+            )
+        ],
+      ),
+    );
   }
 }
