@@ -80,7 +80,8 @@ class GameObject {
 
   void play({Function(int)? callback}) async {
     var startTime = DateTime.now();
-    ProcessResult p = await Process.run(executable, []);
+    ProcessResult p = await Process.run(executable, [],
+        workingDirectory: dirname(executable));
     var playDuration =
         DateTimeRange(start: startTime, end: DateTime.now()).duration.inSeconds;
     playTime.addDuration(playDuration);
