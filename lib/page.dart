@@ -134,6 +134,11 @@ class _GameGalleryPageState extends State<GameGalleryPage>
   }
 
   Future<void> _addItem(final GameObject item) async {
+    setState(() {
+      _overlayState = _overlayEnabled;
+      _isActive = false;
+    });
+
     var artwork = await ImageBucket.instance.putArtwork(item.artwork);
     var banner = await ImageBucket.instance.putBanner(item.banner);
     var bigPicture = await ImageBucket.instance.putBigPicture(item.bigPicture);
@@ -141,16 +146,30 @@ class _GameGalleryPageState extends State<GameGalleryPage>
 
     var newItem = GameObject(item.title, item.executable, artwork, bigPicture,
         banner, logo, item.playTime.getDuration());
+
     await widget.database.save([newItem]);
+
     setState(() {
       _listItem.add(newItem);
+      _overlayState = 0;
+      _isActive = true;
     });
   }
 
   void _removeItem(final GameObject item) async {
+    setState(() {
+      _overlayState = _overlayEnabled;
+      _isActive = false;
+    });
+
     await widget.database.delete([item]);
+
     setState(() {
       _listItem.remove(item);
+      _lastPosition =
+          _lastPosition == 0 ? _lastPosition + 1 : _lastPosition - 1;
+      _overlayState = 0;
+      _isActive = true;
     });
   }
 
@@ -230,15 +249,7 @@ class _GameGalleryPageState extends State<GameGalleryPage>
                 },
                 onSubmit: (data) async {
                   if (context.mounted) Navigator.pop(context);
-                  setState(() {
-                    _overlayState = _overlayEnabled;
-                    _isActive = false;
-                  });
                   await _addItem(GameObject.build(data.flatten()));
-                  setState(() {
-                    _overlayState = 0;
-                    _isActive = true;
-                  });
                 },
               ),
             ),
