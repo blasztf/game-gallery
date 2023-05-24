@@ -37,7 +37,7 @@ abstract class ImageProvider {
       if ((filename = basename(file.path)).startsWith("${cacheId}_")) {
         filename = filename.split('_')[1].replaceAll(extension(filename), '');
         dtr = DateTimeRange(
-            start: DateTime.fromMillisecondsSinceEpoch(filename as int),
+            start: DateTime.fromMillisecondsSinceEpoch(int.parse(filename)),
             end: DateTime.now());
 
         // cache valid
@@ -74,13 +74,32 @@ abstract class ImageProvider {
     return result;
   }
 
-  Future<String> getResponse(String url) async {
+  Future<String> getResponse(String url, {Map<String, String>? headers}) async {
     String result = "";
 
     result = getCacheResponse(url);
 
     if (result.isEmpty) {
-      http.Response response = await http.get(Uri.parse(url));
+      http.Response response = await http.get(Uri.parse(url), headers: headers);
+
+      if (response.statusCode == 200) {
+        result = response.body;
+        putCacheResponse(url, result);
+      }
+    }
+
+    return result;
+  }
+
+  Future<String> postResponse(String url,
+      {Map<String, String>? headers, Object? body}) async {
+    String result = "";
+
+    result = getCacheResponse(url);
+
+    if (result.isEmpty) {
+      http.Response response =
+          await http.post(Uri.parse(url), headers: headers, body: body);
 
       if (response.statusCode == 200) {
         result = response.body;
@@ -103,15 +122,32 @@ class SteamPoweredImageProvider extends ImageProvider {
 class SteamGridDBImageProvider extends ImageProvider {
   @override
   Future<ImageList> findImage(String title) async {
-    String gameId = await getGameId(title);
+    int gameId = await getGameId(title);
     return await getGameImages(gameId);
   }
 
-  Future<ImageList> getGameImages(String gameId) async {
+  Future<ImageList> getGameImages(int gameId) async {
     ImageList listImage = ImageList.empty;
 
-    String response = await getResponse(
-        "https://www.steamgriddb.com/api/public/game/$gameId/home");
+    Map<String, String> headers = {
+      "Referer": "https://www.steamgriddb.com/game/$gameId",
+      "Accept": "application/json, text/plain, */*",
+      "User-Agent":
+          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/78.0.3904.108 Chrome/78.0.3904.108 Safari/537.36",
+    };
+
+    // String url = "https://www.steamgriddb.com/api/public/search/assets";
+    // String response = await postResponse(url, headers: headers, body: {
+
+    // })
+
+    String url = "https://www.steamgriddb.com/api/public/game/$gameId/home";
+    String response = await getResponse(url, headers: headers);
+
+    if (response.isEmpty) {
+      return listImage;
+    }
+
     var result = json.decode(response);
 
     if (result['success']) {
@@ -125,8 +161,9 @@ class SteamGridDBImageProvider extends ImageProvider {
           [for (var item in result['data']['heroes']) item['url'] as String]);
       listImage.bigPictures.addAll([
         for (var item in result['data']['grids'])
-          if (item['width'] == 920 && item['height'] == 430)
-            item['url'] as String
+          if (item['width'] >= item['height']) item['url'] as String
+        // if (item['width'] == 920 && item['height'] == 430)
+        //   item['url'] as String
       ]);
       listImage.logos.addAll(
           [for (var item in result['data']['logos']) item['url'] as String]);
@@ -135,11 +172,19 @@ class SteamGridDBImageProvider extends ImageProvider {
     return listImage;
   }
 
-  Future<String> getGameId(String title) async {
-    String gameId = "";
+  Future<int> getGameId(String title) async {
+    int gameId = -1;
+
+    Map<String, String> headers = {
+      "Referer": "https://www.steamgriddb.com/",
+      "Accept": "application/json, text/plain, */*",
+      "User-Agent":
+          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/78.0.3904.108 Chrome/78.0.3904.108 Safari/537.36",
+    };
 
     String response = await getResponse(
-        "https://www.steamgriddb.com/api/public/search/autocomplete?term=$title");
+        "https://www.steamgriddb.com/api/public/search/autocomplete?term=$title",
+        headers: headers);
     var result = json.decode(response);
 
     if (result['success']) {

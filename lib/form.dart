@@ -1,6 +1,10 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:game_gallery/data.dart';
+import 'package:game_gallery/img.dart';
+import 'package:game_gallery/item.dart';
+import 'package:game_gallery/style.dart';
 
 class GameForm extends StatelessWidget {
   const GameForm({
@@ -139,6 +143,23 @@ class _GameAddFormState extends State<GameAddForm> {
     return result?.files.single;
   }
 
+  void _showImageChooserDialog(ImageList list) {
+    showDialog(
+        context: context,
+        builder: (contextBuilder) {
+          return ImageChooserDialog(
+              listImage: list,
+              onChosen: (bundle) {
+                Navigator.pop(context);
+                _artworkTextController.text = bundle.getString('artwork');
+                _bannerTextController.text = bundle.getString('banner');
+                _bigPictureTextController.text =
+                    bundle.getString('big_picture');
+                _logoTextController.text = bundle.getString('logo');
+              });
+        });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -159,21 +180,36 @@ class _GameAddFormState extends State<GameAddForm> {
           return true;
         },
         onCreateFields: (formData) => [
-          TextFormField(
-            controller: _titleTextController,
-            decoration: const InputDecoration(
-              labelText: "Game Title text",
-              hintText: "Input game title",
-            ),
-            onSaved: (newValue) {
-              formData.putString('title', newValue!);
-            },
-            validator: (value) {
-              if (value?.isEmpty ?? false) {
-                return "Text cannot be empty!";
-              }
-              return null;
-            },
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _titleTextController,
+                  decoration: const InputDecoration(
+                    labelText: "Game Title text",
+                    hintText: "Input game title",
+                  ),
+                  onSaved: (newValue) {
+                    formData.putString('title', newValue!);
+                  },
+                  validator: (value) {
+                    if (value?.isEmpty ?? false) {
+                      return "Text cannot be empty!";
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              IconButton(
+                onPressed: () async {
+                  ImageList list =
+                      await ImageFinder.use(SteamGridDBImageProvider())
+                          .find(_titleTextController.text);
+                  _showImageChooserDialog(list);
+                },
+                icon: const Icon(Icons.search),
+              ),
+            ],
           ),
           TextFormField(
             controller: _executableTextController,
@@ -312,6 +348,98 @@ class _GameAddFormState extends State<GameAddForm> {
             ],
           )
         ],
+      ),
+    );
+  }
+}
+
+class ImageChooserDialog extends StatefulWidget {
+  const ImageChooserDialog(
+      {super.key, required this.listImage, required this.onChosen});
+
+  final ImageList listImage;
+  final Function(Bundle) onChosen;
+
+  @override
+  State<StatefulWidget> createState() => _ImageChooserDialogState();
+}
+
+class _ImageChooserDialogState extends State<ImageChooserDialog> {
+  List<String> _listItem = [];
+
+  final double _spacing = 25.0;
+
+  int get _sizeItem => _listItem.length;
+
+  final ScrollController _scrollController = ScrollController();
+
+  final int _stateArtwork = 1;
+  final int _stateBanner = 2;
+  final int _stateBigPicture = 4;
+  final int _stateLogo = 8;
+
+  int _state = 1;
+
+  final Bundle _bundle = Bundle();
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_state == _stateArtwork) {
+      _listItem = widget.listImage.artworks;
+    } else if (_state == _stateBanner) {
+      _listItem = widget.listImage.banners;
+    } else if (_state == _stateBigPicture) {
+      _listItem = widget.listImage.bigPictures;
+    } else if (_state == _stateLogo) {
+      _listItem = widget.listImage.logos;
+    }
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(_spacing),
+      ),
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      child: Container(
+        color: mcgpalette0Accent,
+        child: AlignedGridView.count(
+          controller: _scrollController,
+          padding: EdgeInsets.all(_spacing),
+          mainAxisSpacing: _spacing,
+          crossAxisSpacing: _spacing,
+          crossAxisCount: 4,
+          itemCount: _sizeItem,
+          itemBuilder: (BuildContext context, int index) => ImageChooserItem(
+            data: _listItem[index],
+            isSelected: false,
+            onPress: (data) {
+              if (_state == _stateArtwork) {
+                _bundle.putString('artwork', _listItem[index]);
+                setState(() {
+                  _state = _stateBanner;
+                });
+              } else if (_state == _stateBanner) {
+                _bundle.putString('banner', _listItem[index]);
+                setState(() {
+                  _state = _stateBigPicture;
+                });
+              } else if (_state == _stateBigPicture) {
+                _bundle.putString('big_picture', _listItem[index]);
+                setState(() {
+                  _state = _stateLogo;
+                });
+              } else if (_state == _stateLogo) {
+                _bundle.putString('logo', _listItem[index]);
+                _state = 0;
+                widget.onChosen(_bundle);
+              }
+            },
+          ),
+        ),
       ),
     );
   }

@@ -4,6 +4,7 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:game_gallery/conf.dart';
 import 'package:game_gallery/fab.dart';
 import 'package:game_gallery/form.dart';
+import 'package:game_gallery/img.dart';
 import 'package:game_gallery/item.dart';
 import 'package:game_gallery/style.dart';
 import 'package:window_manager/window_manager.dart';
