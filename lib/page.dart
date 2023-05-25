@@ -12,6 +12,143 @@ import 'package:xinput_gamepad/xinput_gamepad.dart';
 
 import 'data.dart';
 
+abstract class GalleryPageAdapter<T> {
+  void addItem(T item);
+  void removeItem(T item);
+  T getItem(int index);
+  String getItemImage(int index);
+  int getSize();
+}
+
+class GalleryPageController {
+  GlobalKey? _item;
+  int _crossAxisCount = 0;
+  double _spacing = 0;
+  ScrollController? _scrollController;
+
+  bool scrollTo(int index) {
+    try {
+      var context = _item!.currentContext!;
+      double offset = ((index ~/ _crossAxisCount)).floor() *
+          (context.size!.height + _spacing);
+      _scrollController?.animateTo(offset,
+          duration: const Duration(seconds: 1), curve: Curves.decelerate);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  ScrollController setScroller(ScrollController scroller) {
+    return _scrollController = scroller;
+  }
+
+  void setFactor(GlobalKey activeItemKey, int crossAxisCount, double spacing) {
+    _item = activeItemKey;
+    _crossAxisCount = crossAxisCount;
+    _spacing = spacing;
+  }
+}
+
+class GalleryPage extends StatefulWidget {
+  const GalleryPage(
+      {super.key, required this.adapter, this.controller, this.onItemTouch});
+
+  final GalleryPageAdapter adapter;
+  final GalleryPageController? controller;
+  final Function(dynamic)? onItemTouch;
+
+  @override
+  State<StatefulWidget> createState() => _GalleryPageState();
+}
+
+class _GalleryPageState extends State<GalleryPage> with WidgetsBindingObserver {
+  late Size _lastSize;
+  final double _spacing = 25.0;
+  int _lastPosition = 0;
+  int get _crossAxisCount => _lastSize.width > 1440
+      ? 8
+      : _lastSize.width > 960
+          ? 6
+          : _lastSize.width > 640
+              ? 4
+              : _lastSize.width > 480
+                  ? 2
+                  : 1;
+
+  late final ScrollController _scrollController;
+
+  Size _calcDisplaySize() {
+    return WidgetsBinding.instance.window.physicalSize /
+        WidgetsBinding.instance.window.devicePixelRatio;
+  }
+
+  @override
+  void didChangeMetrics() {
+    setState(() {
+      _lastSize = _calcDisplaySize();
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _lastSize = _calcDisplaySize();
+    _scrollController = ScrollController();
+    widget.controller?.setScroller(_scrollController);
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: mcgpalette0Accent,
+      child: AlignedGridView.count(
+        controller: _scrollController,
+        padding: EdgeInsets.all(_spacing),
+        mainAxisSpacing: _spacing,
+        crossAxisSpacing: _spacing,
+        crossAxisCount: _crossAxisCount,
+        itemCount: widget.adapter.getSize(),
+        itemBuilder: (BuildContext itemBuilderContext, int index) {
+          GlobalObjectKey? activeItemKey;
+          if (_lastPosition == index) {
+            activeItemKey = GlobalObjectKey(widget.adapter.getItem(index));
+            widget.controller?.setFactor(
+              activeItemKey,
+              _crossAxisCount,
+              _spacing,
+            );
+          }
+          return GalleryItem(
+            key: activeItemKey,
+            image: widget.adapter.getItemImage(index),
+            isSelected: _lastPosition == index,
+            onPress: (data) {
+              widget.onItemTouch?.call(widget.adapter.getItem(index));
+              setState(() {
+                _lastPosition = index;
+              });
+            },
+            onLongPress: (data) {
+              widget.onItemTouch?.call(widget.adapter.getItem(index));
+              setState(() {
+                _lastPosition = index;
+              });
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
 class GameGalleryPageOverlay extends StatelessWidget {
   const GameGalleryPageOverlay({super.key, this.message = ""});
 
@@ -32,6 +169,22 @@ class GameGalleryPageOverlay extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class GameGalleryPage2 extends StatefulWidget {
+  @override
+  State<StatefulWidget> createState() {
+    // TODO: implement createState
+    throw UnimplementedError();
+  }
+}
+
+class _GameGalleryPage2State extends State<GameGalleryPage2> {
+  @override
+  Widget build(BuildContext context) {
+    // TODO: implement build
+    throw UnimplementedError();
   }
 }
 
@@ -340,8 +493,7 @@ class _GameGalleryPageState extends State<GameGalleryPage>
                   crossAxisSpacing: _spacing,
                   crossAxisCount: _crossAxisCount,
                   itemCount: _sizeItem,
-                  itemBuilder: (BuildContext context, int index) =>
-                      GameGalleryItem(
+                  itemBuilder: (BuildContext context, int index) => GalleryItem(
                     key: _lastPosition == index
                         ? GlobalObjectKey(_getItem(index))
                         : null,
