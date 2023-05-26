@@ -4,6 +4,7 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:game_gallery/data.dart';
 import 'package:game_gallery/img.dart';
 import 'package:game_gallery/item.dart';
+import 'package:game_gallery/page.dart';
 import 'package:game_gallery/style.dart';
 
 class GameForm extends StatelessWidget {
@@ -143,21 +144,50 @@ class _GameAddFormState extends State<GameAddForm> {
     return result?.files.single;
   }
 
-  void _showImageChooserDialog(ImageList list) {
-    showDialog(
+  Future<void> _recursiveShowImageChooserDialog(
+      ImageList list, Bundle data, String key) async {
+    List<String> images;
+    String nextKey;
+
+    if (key == 'artwork') {
+      images = list.artworks;
+      nextKey = 'banner';
+    } else if (key == 'banner') {
+      images = list.banners;
+      nextKey = 'big_picture';
+    } else if (key == 'big_picture') {
+      images = list.bigPictures;
+      nextKey = 'logo';
+    } else if (key == 'logo') {
+      images = list.logos;
+      nextKey = '';
+    } else {
+      return;
+    }
+
+    await showDialog(
         context: context,
         builder: (contextBuilder) {
           return ImageChooserDialog(
-              listImage: list,
-              onChosen: (bundle) {
+              listImage: images,
+              onChosen: (image) {
                 Navigator.pop(context);
-                _artworkTextController.text = bundle.getString('artwork');
-                _bannerTextController.text = bundle.getString('banner');
-                _bigPictureTextController.text =
-                    bundle.getString('big_picture');
-                _logoTextController.text = bundle.getString('logo');
+                data.putString(key, image);
               });
         });
+
+    await _recursiveShowImageChooserDialog(list, data, nextKey);
+  }
+
+  Future<void> _showImageChooserDialog(ImageList list) async {
+    Bundle data = Bundle();
+
+    await _recursiveShowImageChooserDialog(list, data, 'artwork');
+
+    _artworkTextController.text = data.getString('artwork');
+    _bannerTextController.text = data.getString('banner');
+    _bigPictureTextController.text = data.getString('big_picture');
+    _logoTextController.text = data.getString('logo');
   }
 
   @override
@@ -205,7 +235,7 @@ class _GameAddFormState extends State<GameAddForm> {
                   ImageList list =
                       await ImageFinder.use(SteamGridDBImageProvider())
                           .find(_titleTextController.text);
-                  _showImageChooserDialog(list);
+                  await _showImageChooserDialog(list);
                 },
                 icon: const Icon(Icons.search),
               ),
@@ -353,94 +383,66 @@ class _GameAddFormState extends State<GameAddForm> {
   }
 }
 
+class ImageChooserAdapter extends GalleryPageAdapter<String> {
+  ImageChooserAdapter._(this._list, this._onTap);
+
+  factory ImageChooserAdapter(
+          {required List<String> list, Function(String)? onItemTap}) =>
+      ImageChooserAdapter._(list, onItemTap);
+
+  final List<String> _list;
+  final Function(String)? _onTap;
+
+  @override
+  String getItem(int index) {
+    return _list[index];
+  }
+
+  @override
+  String getItemImage(int index) {
+    return _list[index];
+  }
+
+  @override
+  int getSize() {
+    return _list.length;
+  }
+
+  @override
+  void onItemTap(String item) {
+    _onTap?.call(item);
+  }
+}
+
 class ImageChooserDialog extends StatefulWidget {
   const ImageChooserDialog(
       {super.key, required this.listImage, required this.onChosen});
 
-  final ImageList listImage;
-  final Function(Bundle) onChosen;
+  final List<String> listImage;
+  final Function(String) onChosen;
 
   @override
   State<StatefulWidget> createState() => _ImageChooserDialogState();
 }
 
 class _ImageChooserDialogState extends State<ImageChooserDialog> {
-  List<String> _listItem = [];
-
   final double _spacing = 25.0;
-
-  int get _sizeItem => _listItem.length;
-
-  final ScrollController _scrollController = ScrollController();
-
-  final int _stateArtwork = 1;
-  final int _stateBanner = 2;
-  final int _stateBigPicture = 4;
-  final int _stateLogo = 8;
-
-  int _state = 1;
-
-  final Bundle _bundle = Bundle();
-
-  @override
-  void initState() {
-    super.initState();
-  }
 
   @override
   Widget build(BuildContext context) {
-    if (_state == _stateArtwork) {
-      _listItem = widget.listImage.artworks;
-    } else if (_state == _stateBanner) {
-      _listItem = widget.listImage.banners;
-    } else if (_state == _stateBigPicture) {
-      _listItem = widget.listImage.bigPictures;
-    } else if (_state == _stateLogo) {
-      _listItem = widget.listImage.logos;
-    }
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(_spacing),
-      ),
-      elevation: 0,
-      backgroundColor: Colors.transparent,
-      child: Container(
-        color: mcgpalette0Accent,
-        child: AlignedGridView.count(
-          controller: _scrollController,
-          padding: EdgeInsets.all(_spacing),
-          mainAxisSpacing: _spacing,
-          crossAxisSpacing: _spacing,
-          crossAxisCount: 4,
-          itemCount: _sizeItem,
-          itemBuilder: (BuildContext context, int index) => ImageChooserItem(
-            data: _listItem[index],
-            isSelected: false,
-            onPress: (data) {
-              if (_state == _stateArtwork) {
-                _bundle.putString('artwork', _listItem[index]);
-                setState(() {
-                  _state = _stateBanner;
-                });
-              } else if (_state == _stateBanner) {
-                _bundle.putString('banner', _listItem[index]);
-                setState(() {
-                  _state = _stateBigPicture;
-                });
-              } else if (_state == _stateBigPicture) {
-                _bundle.putString('big_picture', _listItem[index]);
-                setState(() {
-                  _state = _stateLogo;
-                });
-              } else if (_state == _stateLogo) {
-                _bundle.putString('logo', _listItem[index]);
-                _state = 0;
-                widget.onChosen(_bundle);
-              }
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(_spacing),
+        ),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        child: GalleryPage(
+          adapter: ImageChooserAdapter(
+            list: widget.listImage,
+            onItemTap: (data) {
+              widget.onChosen(data);
             },
           ),
-        ),
-      ),
-    );
+        ));
   }
 }

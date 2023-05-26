@@ -13,11 +13,10 @@ import 'package:xinput_gamepad/xinput_gamepad.dart';
 import 'data.dart';
 
 abstract class GalleryPageAdapter<T> {
-  void addItem(T item);
-  void removeItem(T item);
   T getItem(int index);
   String getItemImage(int index);
   int getSize();
+  void onItemTap(T item) {}
 }
 
 class GalleryPageController {
@@ -25,6 +24,10 @@ class GalleryPageController {
   int _crossAxisCount = 0;
   double _spacing = 0;
   ScrollController? _scrollController;
+
+  int getCrossAxisCount() {
+    return _crossAxisCount;
+  }
 
   bool scrollTo(int index) {
     try {
@@ -51,12 +54,10 @@ class GalleryPageController {
 }
 
 class GalleryPage extends StatefulWidget {
-  const GalleryPage(
-      {super.key, required this.adapter, this.controller, this.onItemTouch});
+  const GalleryPage({super.key, required this.adapter, this.controller});
 
   final GalleryPageAdapter adapter;
   final GalleryPageController? controller;
-  final Function(dynamic)? onItemTouch;
 
   @override
   State<StatefulWidget> createState() => _GalleryPageState();
@@ -65,7 +66,7 @@ class GalleryPage extends StatefulWidget {
 class _GalleryPageState extends State<GalleryPage> with WidgetsBindingObserver {
   late Size _lastSize;
   final double _spacing = 25.0;
-  int _lastPosition = 0;
+  int _activeIndex = 0;
   int get _crossAxisCount => _lastSize.width > 1440
       ? 8
       : _lastSize.width > 960
@@ -110,42 +111,72 @@ class _GalleryPageState extends State<GalleryPage> with WidgetsBindingObserver {
     return Container(
       color: mcgpalette0Accent,
       child: AlignedGridView.count(
-        controller: _scrollController,
-        padding: EdgeInsets.all(_spacing),
-        mainAxisSpacing: _spacing,
-        crossAxisSpacing: _spacing,
-        crossAxisCount: _crossAxisCount,
-        itemCount: widget.adapter.getSize(),
-        itemBuilder: (BuildContext itemBuilderContext, int index) {
-          GlobalObjectKey? activeItemKey;
-          if (_lastPosition == index) {
-            activeItemKey = GlobalObjectKey(widget.adapter.getItem(index));
-            widget.controller?.setFactor(
-              activeItemKey,
-              _crossAxisCount,
-              _spacing,
+          controller: widget.controller?._scrollController,
+          padding: EdgeInsets.all(_spacing),
+          mainAxisSpacing: _spacing,
+          crossAxisSpacing: _spacing,
+          crossAxisCount: _crossAxisCount,
+          itemCount: widget.adapter.getSize(),
+          itemBuilder: (BuildContext itemBuilderContext, int index) {
+            GlobalObjectKey? activeItemKey;
+            if (_activeIndex == index) {
+              activeItemKey = GlobalObjectKey(widget.adapter.getItem(index));
+              widget.controller?.setFactor(
+                activeItemKey,
+                _crossAxisCount,
+                _spacing,
+              );
+            }
+            return GalleryItem(
+              key: activeItemKey,
+              image: widget.adapter.getItemImage(index),
+              isSelected: _activeIndex == index,
+              onPress: (data) {
+                widget.adapter.onItemTap.call(widget.adapter.getItem(index));
+                setState(() {
+                  _activeIndex = index;
+                });
+              },
+              onLongPress: (data) {
+                widget.adapter.onItemTap.call(widget.adapter.getItem(index));
+                setState(() {
+                  _activeIndex = index;
+                });
+              },
             );
-          }
-          return GalleryItem(
-            key: activeItemKey,
-            image: widget.adapter.getItemImage(index),
-            isSelected: _lastPosition == index,
-            onPress: (data) {
-              widget.onItemTouch?.call(widget.adapter.getItem(index));
-              setState(() {
-                _lastPosition = index;
-              });
-            },
-            onLongPress: (data) {
-              widget.onItemTouch?.call(widget.adapter.getItem(index));
-              setState(() {
-                _lastPosition = index;
-              });
-            },
-          );
-        },
-      ),
+          }),
     );
+  }
+}
+
+class GameGalleryAdapter extends GalleryPageAdapter<GameObject> {
+  GameGalleryAdapter._(this._list, this._onTap);
+
+  factory GameGalleryAdapter(
+          {required List<GameObject> list, Function(GameObject)? onItemTap}) =>
+      GameGalleryAdapter._(list, onItemTap);
+
+  final List<GameObject> _list;
+  final Function(GameObject)? _onTap;
+
+  @override
+  GameObject getItem(int index) {
+    return _list[index];
+  }
+
+  @override
+  String getItemImage(int index) {
+    return ImageBucket.instance.getArtwork(_list[index].artwork);
+  }
+
+  @override
+  int getSize() {
+    return _list.length;
+  }
+
+  @override
+  void onItemTap(GameObject item) {
+    _onTap?.call(item);
   }
 }
 
@@ -172,22 +203,6 @@ class GameGalleryPageOverlay extends StatelessWidget {
   }
 }
 
-class GameGalleryPage2 extends StatefulWidget {
-  @override
-  State<StatefulWidget> createState() {
-    // TODO: implement createState
-    throw UnimplementedError();
-  }
-}
-
-class _GameGalleryPage2State extends State<GameGalleryPage2> {
-  @override
-  Widget build(BuildContext context) {
-    // TODO: implement build
-    throw UnimplementedError();
-  }
-}
-
 class GameGalleryPage extends StatefulWidget {
   const GameGalleryPage({super.key, required this.database});
 
@@ -199,7 +214,6 @@ class GameGalleryPage extends StatefulWidget {
 
 class _GameGalleryPageState extends State<GameGalleryPage>
     with WidgetsBindingObserver, WindowListener {
-  late Size _lastSize;
   List<GameObject> _listItem = [];
 
   int _lastPosition = 0;
@@ -211,42 +225,18 @@ class _GameGalleryPageState extends State<GameGalleryPage>
   final int _overlayFilePickerOpening = 4;
   final int _overlayFileDragging = 8;
 
-  final double _spacing = 25.0;
+  final Controller _gamepadController = Controller(index: 0);
+  final GalleryPageController _gpController = GalleryPageController();
 
   int get _sizeItem => _listItem.length;
-  int get _crossAxisCount => _lastSize.width > 1440
-      ? 8
-      : _lastSize.width > 960
-          ? 6
-          : _lastSize.width > 640
-              ? 4
-              : _lastSize.width > 480
-                  ? 2
-                  : 1;
-
-  final Controller _gamepadController = Controller(index: 0);
-  final ScrollController _scrollController = ScrollController();
-
-  bool _scroll(int from, int to) {
-    try {
-      var context = GlobalObjectKey(_getItem(from)).currentContext!;
-      double offset =
-          ((to ~/ _crossAxisCount)).floor() * (context.size!.height + _spacing);
-      _scrollController.animateTo(offset,
-          duration: const Duration(seconds: 1), curve: Curves.decelerate);
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
 
   int _movePointerUp() {
-    int newPosition = _lastPosition - _crossAxisCount;
+    int newPosition = _lastPosition - _gpController.getCrossAxisCount();
     return newPosition >= 0 ? newPosition : _lastPosition;
   }
 
   int _movePointerDown() {
-    int newPosition = _lastPosition + _crossAxisCount;
+    int newPosition = _lastPosition + _gpController.getCrossAxisCount();
     return newPosition < _sizeItem ? newPosition : _lastPosition;
   }
 
@@ -280,7 +270,7 @@ class _GameGalleryPageState extends State<GameGalleryPage>
       default:
     }
 
-    if (_lastPosition != newPosition && _scroll(_lastPosition, newPosition)) {
+    if (_lastPosition != newPosition && _gpController.scrollTo(newPosition)) {
       setState(() {
         _lastPosition = newPosition;
       });
@@ -310,11 +300,6 @@ class _GameGalleryPageState extends State<GameGalleryPage>
 
   GameObject _getItem(int index) {
     return _listItem[index];
-  }
-
-  Size _calcDisplaySize() {
-    return WidgetsBinding.instance.window.physicalSize /
-        WidgetsBinding.instance.window.devicePixelRatio;
   }
 
   void _startGame(GameObject game) {
@@ -403,13 +388,6 @@ class _GameGalleryPageState extends State<GameGalleryPage>
   }
 
   @override
-  void didChangeMetrics() {
-    setState(() {
-      _lastSize = _calcDisplaySize();
-    });
-  }
-
-  @override
   void onWindowBlur() {
     _gamepadController.activated = false;
     super.onWindowBlur();
@@ -425,8 +403,6 @@ class _GameGalleryPageState extends State<GameGalleryPage>
   void initState() {
     super.initState();
 
-    _lastSize = _calcDisplaySize();
-
     _gamepadController.buttonsMapping = {
       ControllerButton.DPAD_LEFT: () => _movePointer('left'),
       ControllerButton.DPAD_RIGHT: () => _movePointer('right'),
@@ -440,7 +416,6 @@ class _GameGalleryPageState extends State<GameGalleryPage>
     _gamepadController.listen();
 
     WindowManager.instance.addListener(this);
-    WidgetsBinding.instance.addObserver(this);
 
     widget.database.load().then((value) {
       setState(() {
@@ -452,7 +427,6 @@ class _GameGalleryPageState extends State<GameGalleryPage>
   @override
   void dispose() {
     WindowManager.instance.removeListener(this);
-    WidgetsBinding.instance.removeObserver(this);
 
     super.dispose();
   }
@@ -484,33 +458,11 @@ class _GameGalleryPageState extends State<GameGalleryPage>
                   _overlayState = 0;
                 });
               },
-              child: Container(
-                color: mcgpalette0Accent,
-                child: AlignedGridView.count(
-                  controller: _scrollController,
-                  padding: EdgeInsets.all(_spacing),
-                  mainAxisSpacing: _spacing,
-                  crossAxisSpacing: _spacing,
-                  crossAxisCount: _crossAxisCount,
-                  itemCount: _sizeItem,
-                  itemBuilder: (BuildContext context, int index) => GalleryItem(
-                    key: _lastPosition == index
-                        ? GlobalObjectKey(_getItem(index))
-                        : null,
-                    data: _getItem(index),
-                    isSelected: _lastPosition == index,
-                    onPress: (data) {
-                      setState(() {
-                        _lastPosition = index;
-                      });
-                    },
-                    onLongPress: (data) {
-                      setState(() {
-                        _lastPosition = index;
-                      });
-                    },
-                  ),
+              child: GalleryPage(
+                adapter: GameGalleryAdapter(
+                  list: _listItem,
                 ),
+                controller: _gpController,
               ),
             ),
             floatingActionButton: ExpandableFab(distance: 112.0, children: [
