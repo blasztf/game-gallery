@@ -10,11 +10,11 @@ class Bundle {
   final Map<String, Object> _bundle = HashMap();
 
   int getInt(String key) {
-    return _bundle[key] as int;
+    return (_bundle[key] ?? -1) as int;
   }
 
   String getString(String key) {
-    return _bundle[key] as String;
+    return (_bundle[key] ?? '') as String;
   }
 
   void putInt(String key, int value) {
