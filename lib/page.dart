@@ -19,15 +19,18 @@ abstract class GalleryPageAdapter<T> {
   void onItemTap(T item) {}
 }
 
-class GalleryPageController {
+class GalleryPageController extends ChangeNotifier {
   GlobalKey? _item;
   int _crossAxisCount = 0;
   double _spacing = 0;
   ScrollController? _scrollController;
+  int _activeItemPosition = 0;
 
   int getCrossAxisCount() {
     return _crossAxisCount;
   }
+
+  int get highlightIndex => _activeItemPosition;
 
   bool scrollTo(int index) {
     try {
@@ -40,6 +43,11 @@ class GalleryPageController {
     } catch (e) {
       return false;
     }
+  }
+
+  void highlightItem(int index) {
+    _activeItemPosition = index;
+    notifyListeners();
   }
 
   ScrollController setScroller(ScrollController scroller) {
@@ -66,7 +74,7 @@ class GalleryPage extends StatefulWidget {
 class _GalleryPageState extends State<GalleryPage> with WidgetsBindingObserver {
   late Size _lastSize;
   final double _spacing = 25.0;
-  int _activeIndex = 0;
+
   int get _crossAxisCount => _lastSize.width > 1440
       ? 8
       : _lastSize.width > 960
@@ -119,7 +127,7 @@ class _GalleryPageState extends State<GalleryPage> with WidgetsBindingObserver {
           itemCount: widget.adapter.getSize(),
           itemBuilder: (BuildContext itemBuilderContext, int index) {
             GlobalObjectKey? activeItemKey;
-            if (_activeIndex == index) {
+            if (widget.controller?.highlightIndex == index) {
               activeItemKey = GlobalObjectKey(widget.adapter.getItem(index));
               widget.controller?.setFactor(
                 activeItemKey,
@@ -127,23 +135,25 @@ class _GalleryPageState extends State<GalleryPage> with WidgetsBindingObserver {
                 _spacing,
               );
             }
-            return GalleryItem(
-              key: activeItemKey,
-              image: widget.adapter.getItemImage(index),
-              isSelected: _activeIndex == index,
-              onPress: (data) {
-                widget.adapter.onItemTap.call(widget.adapter.getItem(index));
-                setState(() {
-                  _activeIndex = index;
+            return AnimatedBuilder(
+                animation: widget.controller ?? GalleryPageController(),
+                builder: (context, child) {
+                  return GalleryItem(
+                    key: activeItemKey,
+                    image: widget.adapter.getItemImage(index),
+                    isSelected: widget.controller?.highlightIndex == index,
+                    onPress: (data) {
+                      widget.adapter.onItemTap
+                          .call(widget.adapter.getItem(index));
+                      widget.controller?.highlightItem(index);
+                    },
+                    onLongPress: (data) {
+                      widget.adapter.onItemTap
+                          .call(widget.adapter.getItem(index));
+                      widget.controller?.highlightItem(index);
+                    },
+                  );
                 });
-              },
-              onLongPress: (data) {
-                widget.adapter.onItemTap.call(widget.adapter.getItem(index));
-                setState(() {
-                  _activeIndex = index;
-                });
-              },
-            );
           }),
     );
   }
@@ -271,9 +281,7 @@ class _GameGalleryPageState extends State<GameGalleryPage>
     }
 
     if (_lastPosition != newPosition && _gpController.scrollTo(newPosition)) {
-      setState(() {
-        _lastPosition = newPosition;
-      });
+      _gpController.highlightItem(_lastPosition = newPosition);
     }
   }
 
