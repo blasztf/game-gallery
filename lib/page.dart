@@ -24,13 +24,13 @@ class GalleryPageController extends ChangeNotifier {
   int _crossAxisCount = 0;
   double _spacing = 0;
   ScrollController? _scrollController;
-  int _activeItemPosition = 0;
+  int _highlightIndex = 0;
+
+  int get highlightPosition => _highlightIndex;
 
   int getCrossAxisCount() {
     return _crossAxisCount;
   }
-
-  int get highlightIndex => _activeItemPosition;
 
   bool scrollTo(int index) {
     try {
@@ -46,7 +46,7 @@ class GalleryPageController extends ChangeNotifier {
   }
 
   void highlightItem(int index) {
-    _activeItemPosition = index;
+    _highlightIndex = index;
     notifyListeners();
   }
 
@@ -127,7 +127,7 @@ class _GalleryPageState extends State<GalleryPage> with WidgetsBindingObserver {
           itemCount: widget.adapter.getSize(),
           itemBuilder: (BuildContext itemBuilderContext, int index) {
             GlobalObjectKey? activeItemKey;
-            if (widget.controller?.highlightIndex == index) {
+            if (widget.controller?._highlightIndex == index) {
               activeItemKey = GlobalObjectKey(widget.adapter.getItem(index));
               widget.controller?.setFactor(
                 activeItemKey,
@@ -141,7 +141,7 @@ class _GalleryPageState extends State<GalleryPage> with WidgetsBindingObserver {
                   return GalleryItem(
                     key: activeItemKey,
                     image: widget.adapter.getItemImage(index),
-                    isSelected: widget.controller?.highlightIndex == index,
+                    isSelected: widget.controller?._highlightIndex == index,
                     onPress: (data) {
                       widget.adapter.onItemTap
                           .call(widget.adapter.getItem(index));
@@ -226,7 +226,6 @@ class _GameGalleryPageState extends State<GameGalleryPage>
     with WidgetsBindingObserver, WindowListener {
   List<GameObject> _listItem = [];
 
-  int _lastPosition = 0;
   bool _isActive = true;
 
   int _overlayState = 0;
@@ -241,29 +240,35 @@ class _GameGalleryPageState extends State<GameGalleryPage>
   int get _sizeItem => _listItem.length;
 
   int _movePointerUp() {
-    int newPosition = _lastPosition - _gpController.getCrossAxisCount();
-    return newPosition >= 0 ? newPosition : _lastPosition;
+    int newPosition =
+        _gpController.highlightPosition - _gpController.getCrossAxisCount();
+    return newPosition >= 0 ? newPosition : _gpController.highlightPosition;
   }
 
   int _movePointerDown() {
-    int newPosition = _lastPosition + _gpController.getCrossAxisCount();
-    return newPosition < _sizeItem ? newPosition : _lastPosition;
+    int newPosition =
+        _gpController.highlightPosition + _gpController.getCrossAxisCount();
+    return newPosition < _sizeItem
+        ? newPosition
+        : _gpController.highlightPosition;
   }
 
   int _movePointerLeft() {
-    int newPosition = _lastPosition - 1;
-    return newPosition >= 0 ? newPosition : _lastPosition;
+    int newPosition = _gpController.highlightPosition - 1;
+    return newPosition >= 0 ? newPosition : _gpController.highlightPosition;
   }
 
   int _movePointerRight() {
-    int newPosition = _lastPosition + 1;
-    return newPosition < _sizeItem ? newPosition : _lastPosition;
+    int newPosition = _gpController.highlightPosition + 1;
+    return newPosition < _sizeItem
+        ? newPosition
+        : _gpController.highlightPosition;
   }
 
   void _movePointer(String key) {
     if (!_isActive) return;
 
-    int newPosition = _lastPosition;
+    int newPosition = _gpController.highlightPosition;
     switch (key) {
       case 'up':
         newPosition = _movePointerUp();
@@ -280,8 +285,9 @@ class _GameGalleryPageState extends State<GameGalleryPage>
       default:
     }
 
-    if (_lastPosition != newPosition && _gpController.scrollTo(newPosition)) {
-      _gpController.highlightItem(_lastPosition = newPosition);
+    if (_gpController.highlightPosition != newPosition &&
+        _gpController.scrollTo(newPosition)) {
+      _gpController.highlightItem(newPosition);
     }
   }
 
@@ -300,9 +306,9 @@ class _GameGalleryPageState extends State<GameGalleryPage>
         banner, logo, item.playTime.getDuration());
 
     await widget.database.save([newItem]);
+    _listItem.add(newItem);
 
     setState(() {
-      _listItem.add(newItem);
       _overlayState = 0;
       _isActive = true;
     });
@@ -315,10 +321,13 @@ class _GameGalleryPageState extends State<GameGalleryPage>
     });
 
     await widget.database.delete([item]);
+    _listItem.remove(item);
+
+    _gpController.highlightItem(_gpController.highlightPosition > 0
+        ? _gpController.highlightPosition - 1
+        : 0);
 
     setState(() {
-      _listItem.remove(item);
-      _lastPosition = _lastPosition > 0 ? _lastPosition - 1 : 0;
       _overlayState = 0;
       _isActive = true;
     });
@@ -366,7 +375,7 @@ class _GameGalleryPageState extends State<GameGalleryPage>
           ),
           ElevatedButton(
             onPressed: () {
-              _removeItem(_getItem(_lastPosition));
+              _removeItem(_getItem(_gpController.highlightPosition));
               Navigator.pop(context);
             },
             child: const Text("Yes"),
@@ -426,7 +435,8 @@ class _GameGalleryPageState extends State<GameGalleryPage>
       ControllerButton.DPAD_RIGHT: () => _movePointer('right'),
       ControllerButton.DPAD_UP: () => _movePointer('up'),
       ControllerButton.DPAD_DOWN: () => _movePointer('down'),
-      ControllerButton.START: () => _startGame(_getItem(_lastPosition)),
+      ControllerButton.START: () =>
+          _startGame(_getItem(_gpController.highlightPosition)),
       ControllerButton.Y_BUTTON: () =>
           (Navigator.canPop(context)) ? Navigator.pop(context) : null,
     };
@@ -445,7 +455,6 @@ class _GameGalleryPageState extends State<GameGalleryPage>
   @override
   void dispose() {
     WindowManager.instance.removeListener(this);
-
     super.dispose();
   }
 
@@ -493,7 +502,8 @@ class _GameGalleryPageState extends State<GameGalleryPage>
                 icon: const Icon(Icons.remove),
               ),
               ActionButton(
-                onPressed: () => _startGame(_getItem(_lastPosition)),
+                onPressed: () =>
+                    _startGame(_getItem(_gpController.highlightPosition)),
                 icon: const Icon(Icons.play_arrow),
               ),
             ]),
