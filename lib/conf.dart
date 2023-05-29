@@ -10,6 +10,8 @@ class Errno {
       Errno(id: 'E001', message: "Only supports 1 file at the moment!");
   static final Errno pickerFileNotSelected =
       Errno(id: 'E002', message: "No file selected!");
+  static final Errno autoFindImageNotFound =
+      Errno(id: 'E003', message: "No image found for this game!");
 }
 
 void showErrno(BuildContext context, Errno errno) {

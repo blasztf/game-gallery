@@ -11,12 +11,12 @@ class ImageFinder {
 
   final ImageProvider provider;
 
-  Future<ImageList> find(String title) => provider.findImage(title);
+  Future<ImageBundle> find(String title) => provider.findImage(title);
 }
 
 // interface
 abstract class ImageProvider {
-  Future<ImageList> findImage(String title);
+  Future<ImageBundle> findImage(String title);
 
   final String dir = join(Directory.current.path, '.cache');
 
@@ -111,23 +111,71 @@ abstract class ImageProvider {
   }
 }
 
-class SteamPoweredImageProvider extends ImageProvider {
+class SteamPoweredImageProvider extends SteamGridDBImageProvider {
   @override
-  Future<ImageList> findImage(String title) {
-    // TODO: implement findImage
-    throw UnimplementedError();
+  Future<String> getGameId(String title) async {
+    String gameId = await super.getGameId(title);
+
+    if (gameId.isEmpty) return gameId;
+
+    Map<String, String> headers = {
+      "Referer": "https://www.steamgriddb.com/",
+      "Accept": "application/json, text/plain, */*",
+      "User-Agent":
+          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/78.0.3904.108 Chrome/78.0.3904.108 Safari/537.36",
+    };
+
+    String url = "https://www.steamgriddb.com/api/public/game/$gameId";
+    String response = await getResponse(url, headers: headers);
+
+    try {
+      var result = json.decode(response);
+
+      if (result['success']) {
+        gameId = result['data']['platforms']['steam']['id'];
+      }
+    } catch (e) {
+      // pass
+    }
+
+    return gameId;
+  }
+
+  @override
+  Future<ImageBundle> getGameImages(String gameId) async {
+    ImageBundle result = ImageBundle.empty;
+
+    if (gameId.isEmpty) return result;
+
+    result = ImageBundle();
+
+    result.banners.add(
+        "https://cdn.cloudflare.steamstatic.com/steam/apps/$gameId/library_hero.jpg");
+
+    result.artworks.add(
+        "https://cdn.cloudflare.steamstatic.com/steam/apps/$gameId/library_600x900_2x.jpg");
+
+    result.bigPictures.add(
+        "https://cdn.cloudflare.steamstatic.com/steam/apps/$gameId/header.jpg");
+
+    result.logos.add(
+        "https://cdn.cloudflare.steamstatic.com/steam/apps/$gameId/logo.png");
+
+    return result;
   }
 }
 
 class SteamGridDBImageProvider extends ImageProvider {
   @override
-  Future<ImageList> findImage(String title) async {
-    int gameId = await getGameId(title);
+  Future<ImageBundle> findImage(String title) async {
+    String gameId = await getGameId(title);
     return await getGameImages(gameId);
   }
 
-  Future<ImageList> getGameImages(int gameId) async {
-    ImageList listImage = ImageList.empty;
+  Future<ImageBundle> getGameImages(String gameId) async {
+    ImageBundle listImage = ImageBundle.empty;
+
+    if (gameId.isEmpty) return listImage;
 
     Map<String, String> headers = {
       "Referer": "https://www.steamgriddb.com/game/$gameId",
@@ -136,44 +184,39 @@ class SteamGridDBImageProvider extends ImageProvider {
           "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/78.0.3904.108 Chrome/78.0.3904.108 Safari/537.36",
     };
 
-    // String url = "https://www.steamgriddb.com/api/public/search/assets";
-    // String response = await postResponse(url, headers: headers, body: {
-
-    // })
-
     String url = "https://www.steamgriddb.com/api/public/game/$gameId/home";
     String response = await getResponse(url, headers: headers);
 
-    if (response.isEmpty) {
-      return listImage;
-    }
+    try {
+      var result = json.decode(response);
 
-    var result = json.decode(response);
-
-    if (result['success']) {
-      listImage = ImageList();
-      listImage.artworks.addAll([
-        for (var item in result['data']['grids'])
-          if (item['width'] == 600 && item['height'] == 900)
-            item['url'] as String
-      ]);
-      listImage.banners.addAll(
-          [for (var item in result['data']['heroes']) item['url'] as String]);
-      listImage.bigPictures.addAll([
-        for (var item in result['data']['grids'])
-          if (item['width'] >= item['height']) item['url'] as String
-        // if (item['width'] == 920 && item['height'] == 430)
-        //   item['url'] as String
-      ]);
-      listImage.logos.addAll(
-          [for (var item in result['data']['logos']) item['url'] as String]);
+      if (result['success']) {
+        listImage = ImageBundle();
+        listImage.artworks.addAll([
+          for (var item in result['data']['grids'])
+            if (item['width'] == 600 && item['height'] == 900)
+              item['url'] as String
+        ]);
+        listImage.banners.addAll(
+            [for (var item in result['data']['heroes']) item['url'] as String]);
+        listImage.bigPictures.addAll([
+          for (var item in result['data']['grids'])
+            if (item['width'] >= item['height']) item['url'] as String
+        ]);
+        listImage.logos.addAll(
+            [for (var item in result['data']['logos']) item['url'] as String]);
+      }
+    } catch (e) {
+      // pass
     }
 
     return listImage;
   }
 
-  Future<int> getGameId(String title) async {
-    int gameId = -1;
+  Future<String> getGameId(String title) async {
+    String gameId = "";
+
+    if (title.isEmpty) return gameId;
 
     Map<String, String> headers = {
       "Referer": "https://www.steamgriddb.com/",
@@ -185,15 +228,20 @@ class SteamGridDBImageProvider extends ImageProvider {
     String response = await getResponse(
         "https://www.steamgriddb.com/api/public/search/autocomplete?term=$title",
         headers: headers);
-    var result = json.decode(response);
 
-    if (result['success']) {
-      for (var item in result['data']) {
-        if (item['name'] == title) {
-          gameId = item['id'];
-          break;
+    try {
+      var result = json.decode(response);
+
+      if (result['success']) {
+        for (var item in result['data']) {
+          if (item['name'] == title) {
+            gameId = "${item['id']}";
+            break;
+          }
         }
       }
+    } catch (e) {
+      // pass
     }
 
     return gameId;
@@ -209,15 +257,23 @@ class SteamGridDBImageProvider extends ImageProvider {
 //   final String logo;
 // }
 
-class ImageList {
-  ImageList();
+class ImageBundle {
+  ImageBundle();
 
-  static final ImageList empty = ImageList();
+  static final ImageBundle empty = ImageBundle();
 
   final List<String> artworks = [];
   final List<String> banners = [];
   final List<String> bigPictures = [];
   final List<String> logos = [];
+
+  ImageBundle combine(ImageBundle imageBundle) {
+    artworks.addAll(imageBundle.artworks);
+    banners.addAll(imageBundle.banners);
+    bigPictures.addAll(imageBundle.bigPictures);
+    logos.addAll(imageBundle.logos);
+    return this;
+  }
 }
 
 ////////

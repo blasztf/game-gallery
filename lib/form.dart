@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:game_gallery/conf.dart';
 import 'package:game_gallery/data.dart';
 import 'package:game_gallery/img.dart';
 import 'package:game_gallery/item.dart';
@@ -145,20 +146,20 @@ class _GameAddFormState extends State<GameAddForm> {
   }
 
   Future<void> _recursiveShowImageChooserDialog(
-      ImageList list, Bundle data, String key) async {
+      ImageBundle list, Bundle data, String key) async {
     List<String> images;
     String nextKey;
 
-    if (key == 'artwork') {
+    if (key == 'Artwork') {
       images = list.artworks;
-      nextKey = 'banner';
-    } else if (key == 'banner') {
+      nextKey = 'Banner';
+    } else if (key == 'Banner') {
       images = list.banners;
-      nextKey = 'big_picture';
-    } else if (key == 'big_picture') {
+      nextKey = 'Big Picture';
+    } else if (key == 'Big Picture') {
       images = list.bigPictures;
-      nextKey = 'logo';
-    } else if (key == 'logo') {
+      nextKey = 'Logo';
+    } else if (key == 'Logo') {
       images = list.logos;
       nextKey = '';
     } else {
@@ -169,6 +170,7 @@ class _GameAddFormState extends State<GameAddForm> {
         context: context,
         builder: (contextBuilder) {
           return ImageChooserDialog(
+              title: key,
               listImage: images,
               onChosen: (image) {
                 Navigator.pop(context);
@@ -179,15 +181,15 @@ class _GameAddFormState extends State<GameAddForm> {
     await _recursiveShowImageChooserDialog(list, data, nextKey);
   }
 
-  Future<void> _showImageChooserDialog(ImageList list) async {
+  Future<void> _showImageChooserDialog(ImageBundle list) async {
     Bundle data = Bundle();
 
-    await _recursiveShowImageChooserDialog(list, data, 'artwork');
+    await _recursiveShowImageChooserDialog(list, data, 'Artwork');
 
-    _artworkTextController.text = data.getString('artwork');
-    _bannerTextController.text = data.getString('banner');
-    _bigPictureTextController.text = data.getString('big_picture');
-    _logoTextController.text = data.getString('logo');
+    _artworkTextController.text = data.getString('Artwork');
+    _bannerTextController.text = data.getString('Banner');
+    _bigPictureTextController.text = data.getString('Big Picture');
+    _logoTextController.text = data.getString('Logo');
   }
 
   @override
@@ -232,10 +234,19 @@ class _GameAddFormState extends State<GameAddForm> {
               ),
               IconButton(
                 onPressed: () async {
-                  ImageList list =
+                  ImageBundle bundle1 =
                       await ImageFinder.use(SteamGridDBImageProvider())
                           .find(_titleTextController.text);
-                  await _showImageChooserDialog(list);
+                  ImageBundle bundle2 =
+                      await ImageFinder.use(SteamPoweredImageProvider())
+                          .find(_titleTextController.text);
+
+                  if (bundle1 != ImageBundle.empty &&
+                      bundle2 != ImageBundle.empty) {
+                    await _showImageChooserDialog(bundle2.combine(bundle1));
+                  } else {
+                    showErrno(context, Errno.autoFindImageNotFound);
+                  }
                 },
                 icon: const Icon(Icons.search),
               ),
@@ -414,35 +425,54 @@ class ImageChooserAdapter extends GalleryPageAdapter<String> {
   }
 }
 
-class ImageChooserDialog extends StatefulWidget {
+class ImageChooserDialog extends StatelessWidget {
   const ImageChooserDialog(
-      {super.key, required this.listImage, required this.onChosen});
+      {super.key,
+      required this.listImage,
+      required this.onChosen,
+      required this.title});
 
   final List<String> listImage;
   final Function(String) onChosen;
+  final String title;
 
-  @override
-  State<StatefulWidget> createState() => _ImageChooserDialogState();
-}
-
-class _ImageChooserDialogState extends State<ImageChooserDialog> {
   final double _spacing = 25.0;
 
   @override
   Widget build(BuildContext context) {
     return Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(_spacing),
-        ),
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        child: GalleryPage(
-          adapter: ImageChooserAdapter(
-            list: widget.listImage,
-            onItemTap: (data) {
-              widget.onChosen(data);
-            },
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(_spacing),
+      ),
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      child: Column(children: [
+        SizedBox(
+            child: Container(
+          color: mcgpalette0Accent,
+          padding: EdgeInsets.all(_spacing),
+          width: double.infinity,
+          child: Center(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: _spacing,
+                color: Colors.white,
+              ),
+            ),
           ),
-        ));
+        )),
+        Expanded(
+          child: GalleryPage(
+            adapter: ImageChooserAdapter(
+              list: listImage,
+              onItemTap: (data) {
+                onChosen(data);
+              },
+            ),
+          ),
+        )
+      ]),
+    );
   }
 }

@@ -127,7 +127,8 @@ class _GalleryPageState extends State<GalleryPage> with WidgetsBindingObserver {
           itemCount: widget.adapter.getSize(),
           itemBuilder: (BuildContext itemBuilderContext, int index) {
             GlobalObjectKey? activeItemKey;
-            if (widget.controller?._highlightIndex == index) {
+            bool isSelected = widget.controller?._highlightIndex == index;
+            if (isSelected) {
               activeItemKey = GlobalObjectKey(widget.adapter.getItem(index));
               widget.controller?.setFactor(
                 activeItemKey,
@@ -141,7 +142,7 @@ class _GalleryPageState extends State<GalleryPage> with WidgetsBindingObserver {
                   return GalleryItem(
                     key: activeItemKey,
                     image: widget.adapter.getItemImage(index),
-                    isSelected: widget.controller?._highlightIndex == index,
+                    isSelected: isSelected,
                     onPress: (data) {
                       widget.adapter.onItemTap
                           .call(widget.adapter.getItem(index));
