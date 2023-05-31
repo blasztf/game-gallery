@@ -1,10 +1,8 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:game_gallery/conf.dart';
 import 'package:game_gallery/data.dart';
 import 'package:game_gallery/img.dart';
-import 'package:game_gallery/item.dart';
 import 'package:game_gallery/page.dart';
 import 'package:game_gallery/style.dart';
 
