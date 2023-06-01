@@ -8,10 +8,12 @@ class Errno {
 
   static final Errno dragAndDropMultipleItems =
       Errno(id: 'E001', message: "Only supports 1 file at the moment!");
-  static final Errno pickerFileNotSelected =
+  static final Errno fileNotSelected =
       Errno(id: 'E002', message: "No file selected!");
-  static final Errno autoFindImageNotFound =
-      Errno(id: 'E003', message: "No image found for this game!");
+  static final Errno imageNotFound =
+      Errno(id: 'E003', message: "No image found!");
+  static final Errno listEmpty =
+      Errno(id: 'E004', message: "No item in the list!");
 }
 
 void showErrno(BuildContext context, Errno errno) {

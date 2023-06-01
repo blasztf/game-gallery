@@ -292,7 +292,7 @@ class _GameGalleryPageState extends State<GameGalleryPage>
     }
   }
 
-  Future<void> _addItem(final GameObject item) async {
+  Future<void> _saveItem(final GameObject item) async {
     setState(() {
       _overlayState = _overlayEnabled;
       _isActive = false;
@@ -386,7 +386,7 @@ class _GameGalleryPageState extends State<GameGalleryPage>
     );
   }
 
-  void _showDialogAddForm({Bundle? initialValue}) {
+  void _showDialogSaveForm({required String title, GameObject? initialValue}) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -394,18 +394,18 @@ class _GameGalleryPageState extends State<GameGalleryPage>
         return IgnorePointer(
           ignoring: !_isActive,
           child: AlertDialog(
-            title: const Text("Add new game"),
+            title: Text(title),
             content: SizedBox(
               width: MediaQuery.of(context).size.width / 2,
               height: MediaQuery.of(context).size.height / 2,
-              child: GameAddForm(
+              child: GameSaveForm(
                 initialValue: initialValue,
                 onCancel: () {
                   Navigator.pop(context);
                 },
                 onSubmit: (data) async {
                   if (context.mounted) Navigator.pop(context);
-                  await _addItem(GameObject.build(data.flatten()));
+                  await _saveItem(data);
                 },
               ),
             ),
@@ -471,9 +471,12 @@ class _GameGalleryPageState extends State<GameGalleryPage>
                 if (detail.files.length > 1) {
                   showErrno(context, Errno.dragAndDropMultipleItems);
                 } else {
-                  Bundle initialValue = Bundle();
-                  initialValue.putString('executable', detail.files[0].path);
-                  _showDialogAddForm(initialValue: initialValue);
+                  Bundle data = Bundle();
+                  data.putString('executable', detail.files[0].path);
+                  data.putInt('duration', 0);
+                  _showDialogSaveForm(
+                      title: "Add game",
+                      initialValue: GameObject.build(data.flatten()));
                 }
               },
               onDragEntered: (detail) {
@@ -495,8 +498,19 @@ class _GameGalleryPageState extends State<GameGalleryPage>
             ),
             floatingActionButton: ExpandableFab(distance: 112.0, children: [
               ActionButton(
-                onPressed: _showDialogAddForm,
+                onPressed: () => _showDialogSaveForm(title: "Add game"),
                 icon: const Icon(Icons.add),
+              ),
+              ActionButton(
+                onPressed: () {
+                  if (_listItem.isEmpty) {
+                    showErrno(context, Errno.listEmpty);
+                  } else {
+                    GameObject item = _getItem(_gpController.highlightPosition);
+                    _showDialogSaveForm(title: "Edit game", initialValue: item);
+                  }
+                },
+                icon: const Icon(Icons.edit),
               ),
               ActionButton(
                 onPressed: _showDialogRemoveItem,

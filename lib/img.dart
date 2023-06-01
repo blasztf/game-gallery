@@ -161,7 +161,37 @@ class SteamPoweredImageProvider extends SteamGridDBImageProvider {
     result.logos.add(
         "https://cdn.cloudflare.steamstatic.com/steam/apps/$gameId/logo.png");
 
+    result = await validateResult(result);
+
     return result;
+  }
+
+  Future<ImageBundle> validateResult(ImageBundle imageBundle) async {
+    var result = ImageBundle();
+    var client = http.Client();
+    await validateLinks(imageBundle.artworks, client);
+    await validateLinks(imageBundle.banners, client);
+    await validateLinks(imageBundle.bigPictures, client);
+    await validateLinks(imageBundle.logos, client);
+
+    return result.combine(imageBundle);
+  }
+
+  Future<List<String>> validateLinks(
+      List<String> list, http.Client client) async {
+    for (var image in list.toList()) {
+      if (!await isLinkValid(image, client)) {
+        list.remove(image);
+      }
+    }
+
+    return list;
+  }
+
+  Future<bool> isLinkValid(String image, http.Client client) async {
+    Uri url = Uri.parse(image);
+    http.Response response = await client.head(url);
+    return response.statusCode < 400;
   }
 }
 

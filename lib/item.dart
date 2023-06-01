@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:game_gallery/conf.dart';
 import 'package:game_gallery/style.dart';
 
 class GalleryItem extends StatelessWidget {
@@ -46,6 +47,10 @@ class GalleryItem extends StatelessWidget {
                 ? Image.network(
                     image,
                     fit: BoxFit.fill,
+                    errorBuilder: (context, error, stackTrace) {
+                      // showErrno(context, Errno.imageNotFound);
+                      return Text(Errno.imageNotFound.message);
+                    },
                   )
                 : Image.file(
                     File(image),

@@ -80,22 +80,22 @@ class GameForm extends StatelessWidget {
   }
 }
 
-class GameAddForm extends StatefulWidget {
-  const GameAddForm(
+class GameSaveForm extends StatefulWidget {
+  const GameSaveForm(
       {super.key,
       required this.onSubmit,
       this.initialValue,
       required this.onCancel});
 
-  final void Function(Bundle) onSubmit;
-  final Bundle? initialValue;
+  final void Function(GameObject) onSubmit;
+  final GameObject? initialValue;
   final void Function() onCancel;
 
   @override
-  State<StatefulWidget> createState() => _GameAddFormState();
+  State<StatefulWidget> createState() => _GameSaveFormState();
 }
 
-class _GameAddFormState extends State<GameAddForm> {
+class _GameSaveFormState extends State<GameSaveForm> {
   final TextEditingController _titleTextController = TextEditingController();
   final TextEditingController _artworkTextController = TextEditingController();
   final TextEditingController _bigPictureTextController =
@@ -103,7 +103,8 @@ class _GameAddFormState extends State<GameAddForm> {
   final TextEditingController _bannerTextController = TextEditingController();
   final TextEditingController _logoTextController = TextEditingController();
 
-  late final TextEditingController _executableTextController;
+  final TextEditingController _executableTextController =
+      TextEditingController();
 
   bool _isFilePickerOpened = false;
 
@@ -193,8 +194,12 @@ class _GameAddFormState extends State<GameAddForm> {
   @override
   void initState() {
     super.initState();
-    _executableTextController = TextEditingController(
-        text: widget.initialValue?.getString('executable'));
+    _executableTextController.text = widget.initialValue?.executable ?? '';
+
+    _artworkTextController.text = widget.initialValue?.artwork ?? '';
+    _bannerTextController.text = widget.initialValue?.banner ?? '';
+    _bigPictureTextController.text = widget.initialValue?.bigPicture ?? '';
+    _logoTextController.text = widget.initialValue?.logo ?? '';
   }
 
   @override
@@ -202,11 +207,11 @@ class _GameAddFormState extends State<GameAddForm> {
     return AbsorbPointer(
       absorbing: _isFilePickerOpened,
       child: GameForm(
-        submitButtonLabel: const Text("Add"),
+        submitButtonLabel: const Text("Save"),
         onCancel: widget.onCancel,
         onSubmit: (formData) {
           formData.putInt('duration', 0);
-          widget.onSubmit(formData);
+          widget.onSubmit(GameObject.build(formData.flatten()));
           return true;
         },
         onCreateFields: (formData) => [
@@ -243,7 +248,7 @@ class _GameAddFormState extends State<GameAddForm> {
                       bundle2 != ImageBundle.empty) {
                     await _showImageChooserDialog(bundle2.combine(bundle1));
                   } else {
-                    showErrno(context, Errno.autoFindImageNotFound);
+                    showErrno(context, Errno.imageNotFound);
                   }
                 },
                 icon: const Icon(Icons.search),
