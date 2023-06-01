@@ -126,19 +126,20 @@ class _GalleryPageState extends State<GalleryPage> with WidgetsBindingObserver {
           crossAxisCount: _crossAxisCount,
           itemCount: widget.adapter.getSize(),
           itemBuilder: (BuildContext itemBuilderContext, int index) {
-            GlobalObjectKey? activeItemKey;
-            bool isSelected = widget.controller?._highlightIndex == index;
-            if (isSelected) {
-              activeItemKey = GlobalObjectKey(widget.adapter.getItem(index));
-              widget.controller?.setFactor(
-                activeItemKey,
-                _crossAxisCount,
-                _spacing,
-              );
-            }
             return AnimatedBuilder(
                 animation: widget.controller ?? GalleryPageController(),
                 builder: (context, child) {
+                  GlobalObjectKey? activeItemKey;
+                  bool isSelected = widget.controller?._highlightIndex == index;
+                  if (isSelected) {
+                    activeItemKey =
+                        GlobalObjectKey(widget.adapter.getItem(index));
+                    widget.controller?.setFactor(
+                      activeItemKey,
+                      _crossAxisCount,
+                      _spacing,
+                    );
+                  }
                   return GalleryItem(
                     key: activeItemKey,
                     image: widget.adapter.getItemImage(index),
@@ -292,7 +293,8 @@ class _GameGalleryPageState extends State<GameGalleryPage>
     }
   }
 
-  Future<void> _saveItem(final GameObject item) async {
+  Future<void> _saveItem(
+      final GameObject item, final GameObject? oldItem) async {
     setState(() {
       _overlayState = _overlayEnabled;
       _isActive = false;
@@ -304,10 +306,16 @@ class _GameGalleryPageState extends State<GameGalleryPage>
     var logo = await ImageBucket.instance.putLogo(item.logo);
 
     var newItem = GameObject(item.title, item.executable, artwork, bigPicture,
-        banner, logo, item.playTime.getDuration());
+        banner, logo, item.playTime.getDuration(),
+        id: item.id);
 
     await widget.database.save([newItem]);
-    _listItem.add(newItem);
+
+    if (_listItem.contains(oldItem)) {
+      _listItem[_listItem.indexOf(oldItem!)] = newItem;
+    } else {
+      _listItem.add(newItem);
+    }
 
     setState(() {
       _overlayState = 0;
@@ -405,7 +413,7 @@ class _GameGalleryPageState extends State<GameGalleryPage>
                 },
                 onSubmit: (data) async {
                   if (context.mounted) Navigator.pop(context);
-                  await _saveItem(data);
+                  await _saveItem(data, initialValue);
                 },
               ),
             ),

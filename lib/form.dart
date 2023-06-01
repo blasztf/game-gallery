@@ -196,6 +196,7 @@ class _GameSaveFormState extends State<GameSaveForm> {
     super.initState();
     _executableTextController.text = widget.initialValue?.executable ?? '';
 
+    _titleTextController.text = widget.initialValue?.title ?? '';
     _artworkTextController.text = widget.initialValue?.artwork ?? '';
     _bannerTextController.text = widget.initialValue?.banner ?? '';
     _bigPictureTextController.text = widget.initialValue?.bigPicture ?? '';
@@ -214,184 +215,187 @@ class _GameSaveFormState extends State<GameSaveForm> {
           widget.onSubmit(GameObject.build(formData.flatten()));
           return true;
         },
-        onCreateFields: (formData) => [
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _titleTextController,
-                  decoration: const InputDecoration(
-                    labelText: "Game Title text",
-                    hintText: "Input game title",
+        onCreateFields: (formData) {
+          formData.putInt('id', widget.initialValue?.id ?? -1);
+          return [
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _titleTextController,
+                    decoration: const InputDecoration(
+                      labelText: "Game Title text",
+                      hintText: "Input game title",
+                    ),
+                    onSaved: (newValue) {
+                      formData.putString('title', newValue!);
+                    },
+                    validator: (value) {
+                      if (value?.isEmpty ?? false) {
+                        return "Text cannot be empty!";
+                      }
+                      return null;
+                    },
                   ),
-                  onSaved: (newValue) {
-                    formData.putString('title', newValue!);
-                  },
-                  validator: (value) {
-                    if (value?.isEmpty ?? false) {
-                      return "Text cannot be empty!";
-                    }
-                    return null;
-                  },
                 ),
-              ),
-              IconButton(
-                onPressed: () async {
-                  ImageBundle bundle1 =
-                      await ImageFinder.use(SteamGridDBImageProvider())
-                          .find(_titleTextController.text);
-                  ImageBundle bundle2 =
-                      await ImageFinder.use(SteamPoweredImageProvider())
-                          .find(_titleTextController.text);
+                IconButton(
+                  onPressed: () async {
+                    ImageBundle bundle1 =
+                        await ImageFinder.use(SteamGridDBImageProvider())
+                            .find(_titleTextController.text);
+                    ImageBundle bundle2 =
+                        await ImageFinder.use(SteamPoweredImageProvider())
+                            .find(_titleTextController.text);
 
-                  if (bundle1 != ImageBundle.empty &&
-                      bundle2 != ImageBundle.empty) {
-                    await _showImageChooserDialog(bundle2.combine(bundle1));
-                  } else {
-                    showErrno(context, Errno.imageNotFound);
-                  }
-                },
-                icon: const Icon(Icons.search),
-              ),
-            ],
-          ),
-          TextFormField(
-            controller: _executableTextController,
-            decoration: const InputDecoration(
-              labelText: "Game Executable path",
-              hintText: "Click to select file",
+                    if (bundle1 != ImageBundle.empty &&
+                        bundle2 != ImageBundle.empty) {
+                      await _showImageChooserDialog(bundle2.combine(bundle1));
+                    } else {
+                      showErrno(context, Errno.imageNotFound);
+                    }
+                  },
+                  icon: const Icon(Icons.search),
+                ),
+              ],
             ),
-            onTap: () async {
-              PlatformFile? file = await pickGameFile();
-              _executableTextController.text = file?.path ?? '';
-            },
-            onSaved: (newValue) {
-              formData.putString('executable', newValue!);
-            },
-            validator: (value) {
-              if (value?.isEmpty ?? false) {
-                return "Path cannot be empty!";
-              }
-              return null;
-            },
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _artworkTextController,
-                  decoration: const InputDecoration(
-                    labelText: "Game Artwork path",
-                    hintText: "Click search icon to select file",
+            TextFormField(
+              controller: _executableTextController,
+              decoration: const InputDecoration(
+                labelText: "Game Executable path",
+                hintText: "Click to select file",
+              ),
+              onTap: () async {
+                PlatformFile? file = await pickGameFile();
+                _executableTextController.text = file?.path ?? '';
+              },
+              onSaved: (newValue) {
+                formData.putString('executable', newValue!);
+              },
+              validator: (value) {
+                if (value?.isEmpty ?? false) {
+                  return "Path cannot be empty!";
+                }
+                return null;
+              },
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _artworkTextController,
+                    decoration: const InputDecoration(
+                      labelText: "Game Artwork path",
+                      hintText: "Click search icon to select file",
+                    ),
+                    onSaved: (newValue) {
+                      formData.putString('artwork', newValue!);
+                    },
+                    validator: (value) {
+                      if (value?.isEmpty ?? false) {
+                        return "Path cannot be empty!";
+                      }
+                      return null;
+                    },
                   ),
-                  onSaved: (newValue) {
-                    formData.putString('artwork', newValue!);
-                  },
-                  validator: (value) {
-                    if (value?.isEmpty ?? false) {
-                      return "Path cannot be empty!";
-                    }
-                    return null;
-                  },
                 ),
-              ),
-              IconButton(
-                onPressed: () async {
-                  PlatformFile? file = await pickImageFile();
-                  _artworkTextController.text = file?.path ?? '';
-                },
-                icon: const Icon(Icons.search),
-              ),
-            ],
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _bigPictureTextController,
-                  decoration: const InputDecoration(
-                    labelText: "Game Big Picture path",
-                    hintText: "Click search icon to select file",
+                IconButton(
+                  onPressed: () async {
+                    PlatformFile? file = await pickImageFile();
+                    _artworkTextController.text = file?.path ?? '';
+                  },
+                  icon: const Icon(Icons.search),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _bigPictureTextController,
+                    decoration: const InputDecoration(
+                      labelText: "Game Big Picture path",
+                      hintText: "Click search icon to select file",
+                    ),
+                    onSaved: (newValue) {
+                      formData.putString('bigPicture', newValue!);
+                    },
+                    validator: (value) {
+                      if (value?.isEmpty ?? false) {
+                        return "Path cannot be empty!";
+                      }
+                      return null;
+                    },
                   ),
-                  onSaved: (newValue) {
-                    formData.putString('bigPicture', newValue!);
-                  },
-                  validator: (value) {
-                    if (value?.isEmpty ?? false) {
-                      return "Path cannot be empty!";
-                    }
-                    return null;
-                  },
                 ),
-              ),
-              IconButton(
-                onPressed: () async {
-                  PlatformFile? file = await pickImageFile();
-                  _bigPictureTextController.text = file?.path ?? '';
-                },
-                icon: const Icon(Icons.search),
-              ),
-            ],
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _bannerTextController,
-                  decoration: const InputDecoration(
-                    labelText: "Game Banner path",
-                    hintText: "Click search icon to select file",
+                IconButton(
+                  onPressed: () async {
+                    PlatformFile? file = await pickImageFile();
+                    _bigPictureTextController.text = file?.path ?? '';
+                  },
+                  icon: const Icon(Icons.search),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _bannerTextController,
+                    decoration: const InputDecoration(
+                      labelText: "Game Banner path",
+                      hintText: "Click search icon to select file",
+                    ),
+                    onSaved: (newValue) {
+                      formData.putString('banner', newValue!);
+                    },
+                    validator: (value) {
+                      if (value?.isEmpty ?? false) {
+                        return "Path cannot be empty!";
+                      }
+                      return null;
+                    },
                   ),
-                  onSaved: (newValue) {
-                    formData.putString('banner', newValue!);
-                  },
-                  validator: (value) {
-                    if (value?.isEmpty ?? false) {
-                      return "Path cannot be empty!";
-                    }
-                    return null;
-                  },
                 ),
-              ),
-              IconButton(
-                onPressed: () async {
-                  PlatformFile? file = await pickImageFile();
-                  _bannerTextController.text = file?.path ?? '';
-                },
-                icon: const Icon(Icons.search),
-              ),
-            ],
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _logoTextController,
-                  decoration: const InputDecoration(
-                    labelText: "Game Logo path",
-                    hintText: "Click search icon to select file",
+                IconButton(
+                  onPressed: () async {
+                    PlatformFile? file = await pickImageFile();
+                    _bannerTextController.text = file?.path ?? '';
+                  },
+                  icon: const Icon(Icons.search),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _logoTextController,
+                    decoration: const InputDecoration(
+                      labelText: "Game Logo path",
+                      hintText: "Click search icon to select file",
+                    ),
+                    onSaved: (newValue) {
+                      formData.putString('logo', newValue!);
+                    },
+                    validator: (value) {
+                      if (value?.isEmpty ?? false) {
+                        return "Path cannot be empty!";
+                      }
+                      return null;
+                    },
                   ),
-                  onSaved: (newValue) {
-                    formData.putString('logo', newValue!);
-                  },
-                  validator: (value) {
-                    if (value?.isEmpty ?? false) {
-                      return "Path cannot be empty!";
-                    }
-                    return null;
-                  },
                 ),
-              ),
-              IconButton(
-                onPressed: () async {
-                  PlatformFile? file = await pickImageFile();
-                  _logoTextController.text = file?.path ?? '';
-                },
-                icon: const Icon(Icons.search),
-              ),
-            ],
-          )
-        ],
+                IconButton(
+                  onPressed: () async {
+                    PlatformFile? file = await pickImageFile();
+                    _logoTextController.text = file?.path ?? '';
+                  },
+                  icon: const Icon(Icons.search),
+                ),
+              ],
+            )
+          ];
+        },
       ),
     );
   }
