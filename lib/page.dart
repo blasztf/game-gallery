@@ -518,7 +518,7 @@ class _GameGalleryPageState extends State<GameGalleryPage>
                     _showDialogSaveForm(title: "Edit game", initialValue: item);
                   }
                 },
-                icon: const Icon(Icons.edit),
+                icon: const Icon(Icons.edit_note),
               ),
               ActionButton(
                 onPressed: _showDialogRemoveItem,

@@ -100,13 +100,13 @@ class GameObject {
   }
 
   factory GameObject.build(Map<String, Object?> data) => GameObject(
-      data['title'] as String,
-      data['executable'] as String,
-      data['artwork'] as String,
-      data['bigPicture'] as String,
-      data['banner'] as String,
-      data['logo'] as String,
-      data['duration'] as int,
+      (data['title'] ?? '') as String,
+      (data['executable'] ?? '') as String,
+      (data['artwork'] ?? '') as String,
+      (data['bigPicture'] ?? '') as String,
+      (data['banner'] ?? '') as String,
+      (data['logo'] ?? '') as String,
+      (data['duration'] ?? 0) as int,
       id: (data['id'] ?? 0) as int);
 }
 
