@@ -278,15 +278,6 @@ class SteamGridDBImageProvider extends ImageProvider {
   }
 }
 
-// class ImageObject {
-//   ImageObject(this.artwork, this.banner, this.bigPicture, this.logo);
-
-//   final String artwork;
-//   final String banner;
-//   final String bigPicture;
-//   final String logo;
-// }
-
 class ImageBundle {
   ImageBundle();
 
@@ -325,18 +316,20 @@ class ImageBucket {
     Directory(join(dir, 'logo')).createSync(recursive: true);
   }
 
-  // String _get(String path, String type) {
-  //   String hashFilename =
-  //       md5.convert(utf8.encode(path)).toString() + extension(path);
-  //   return join(dir, type, hashFilename);
-  // }
-
   String _get(String imageId, String type) {
     return join(dir, type, imageId);
   }
 
   Future<String> _put(String path, String type) async {
     path = path.replaceAll(RegExp(r'(\?|\#).*'), '');
+
+    // Determine if path is path or filename-only.
+    if (!path.contains('/')) {
+      if (_exists(path, type)) {
+        return path;
+      }
+    }
+
     String hashFilename = md5
             .convert(
                 utf8.encode("$path${DateTime.now().millisecondsSinceEpoch}"))
@@ -347,6 +340,10 @@ class ImageBucket {
     } else {
       return "";
     }
+  }
+
+  bool _exists(String filename, String type) {
+    return File(join(dir, type, filename)).existsSync();
   }
 
   String getArtwork(String path) {
