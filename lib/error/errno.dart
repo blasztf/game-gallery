@@ -31,15 +31,3 @@ void showErrno(BuildContext context, Errno errno) {
             ],
           ));
 }
-
-Future showMessage(BuildContext context, String message) async {
-  ThemeData theme = Theme.of(context);
-  return await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-            backgroundColor: theme.primaryColor,
-            titleTextStyle: theme.primaryTextTheme.titleMedium,
-            contentTextStyle: theme.primaryTextTheme.bodyMedium,
-            content: Text(message),
-          ));
-}

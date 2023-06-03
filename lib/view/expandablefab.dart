@@ -1,7 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:game_gallery/style.dart';
+import 'package:mangw/style.dart';
 
 @immutable
 class ActionButton extends StatelessWidget {

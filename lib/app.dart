@@ -1,8 +1,9 @@
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart';
-import 'package:game_gallery/data.dart';
-import 'package:game_gallery/page.dart';
-import 'package:game_gallery/style.dart';
+import 'package:mangw/model/gamecardrepo.dart';
+import 'package:mangw/style.dart';
+import 'package:mangw/view/gamegallerypage.dart';
+
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 final buttonColors = WindowButtonColors(
@@ -63,7 +64,7 @@ class GameGalleryApp extends StatelessWidget {
             title: Text(title),
           ),
           body: GameGalleryPage(
-            database: GameObjectDatabase(databaseFactoryFfi),
+            repository: GameCardRepository(databaseFactoryFfi),
           ),
         ));
   }

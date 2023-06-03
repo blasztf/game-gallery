@@ -1,9 +1,6 @@
-import 'dart:io';
-import 'package:path/path.dart';
-
 import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart';
-import 'package:game_gallery/app.dart';
+import 'package:mangw/app.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {

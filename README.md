@@ -1,6 +1,6 @@
 # ManGW
 
-Manageable Game for Windows
+Management Game for Windows
 
 ## Getting Started
 
